@@ -37,6 +37,8 @@ import type { PluginChangeEvent } from '../../shared/plugins/plugin-change-event
 import { waitForPluginRefreshSettlement } from './plugin-refresh-settlement'
 import { PluginEditorRouter } from './plugin-editor-router'
 import { PluginServiceRuntimeOperations } from './plugin-service-runtime-operations'
+import { PluginEditorDiagnosticsBus } from './plugin-editor-diagnostics-bus'
+import type { RendererEditorDiagnosticsEvent } from '../../shared/plugins/plugin-editor-renderer-contract'
 
 export type { PluginRuntimeDelegate } from './plugin-host-service-bindings'
 export type { PluginLogLine } from './plugin-log-buffer'
@@ -51,6 +53,7 @@ export class PluginService {
   private readonly runtimeOperations: PluginServiceRuntimeOperations
   private readonly logBuffer = new PluginLogBuffer()
   private readonly contentVerifier = new PluginContentVerifier()
+  private readonly editorDiagnosticsBus = new PluginEditorDiagnosticsBus()
   readonly contentPacks: PluginContentPackRegistry
   readonly panels: PluginPanelController
   readonly editor: PluginEditorRouter
@@ -105,7 +108,7 @@ export class PluginService {
       getGrantedCapabilities: (pluginKey) => this.getGrantedCapabilities(pluginKey),
       ensurePlugin: (plugin) => this.workerController.ensure(plugin),
       registry: this.registry,
-      onDiagnostics: () => undefined
+      onDiagnostics: (event) => this.editorDiagnosticsBus.emit(event)
     })
     this.runtimeOperations = new PluginServiceRuntimeOperations({
       pluginsDataDir: getPluginsDataDir(options.userDataPath),
@@ -125,6 +128,10 @@ export class PluginService {
 
   setRuntimeDelegate(delegate: PluginRuntimeDelegate | null): void {
     this.runtimeDelegate = delegate
+  }
+
+  onEditorDiagnostics(listener: (event: RendererEditorDiagnosticsEvent) => void): () => void {
+    return this.editorDiagnosticsBus.subscribe(listener)
   }
 
   onChanged(listener: (event: PluginChangeEvent) => void): () => void {
@@ -321,6 +328,7 @@ export class PluginService {
     this.disposed = true
     this.housekeeping.dispose()
     this.panels.dispose()
+    this.editorDiagnosticsBus.clear()
     this.editor.dispose()
     await this.refreshChain.catch(() => undefined)
     await this.workerController.dispose()

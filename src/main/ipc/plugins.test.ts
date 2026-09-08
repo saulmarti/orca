@@ -148,6 +148,7 @@ describe('plugin settings lifecycle authority', () => {
     } as unknown as Store
     const service = {
       setRuntimeDelegate: vi.fn(),
+      onEditorDiagnostics: vi.fn(() => vi.fn()),
       refresh: vi.fn().mockResolvedValue(undefined)
     } as unknown as PluginService
     registerPluginHandlers(store, service, null)

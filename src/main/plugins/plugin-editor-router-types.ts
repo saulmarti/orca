@@ -1,22 +1,15 @@
 import type { PluginCapabilityKind } from '../../shared/plugins/plugin-capabilities'
-import type { PluginEditorProviderFeature } from '../../shared/plugins/plugin-editor-contributions'
-import type { EditorDiagnosticsPublication } from '../../shared/plugins/plugin-editor-protocol'
+import type {
+  EditorProviderBinding,
+  RendererEditorDiagnosticsEvent
+} from '../../shared/plugins/plugin-editor-renderer-contract'
 import type {
   PluginEditorProviderExtension,
   PluginExtensionRegistry
 } from '../../shared/plugins/plugin-extension-registry'
 import type { DiscoveredPlugin, ValidDiscoveredPlugin } from './plugin-discovery'
 
-export type EditorProviderBinding = {
-  pluginKey: string
-  providerId: string
-  features: readonly PluginEditorProviderFeature[]
-}
-
-export type RendererEditorDiagnosticsEvent = EditorProviderBinding & {
-  ownerKey: string
-  publication: EditorDiagnosticsPublication
-}
+export type { EditorProviderBinding, RendererEditorDiagnosticsEvent }
 
 export type BoundProvider = EditorProviderBinding & {
   key: string
