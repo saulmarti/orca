@@ -7,6 +7,10 @@ import {
   type PluginHostMethodSpec
 } from '../../shared/plugins/plugin-host-api'
 import type { PluginEventName } from '../../shared/plugins/plugin-manifest'
+import {
+  PLUGIN_WORKSPACE_DIRECTORY_ENTRY_LIMIT,
+  PLUGIN_WORKSPACE_FILE_MAX_BYTES
+} from '../../shared/plugins/plugin-workspace-file-api'
 
 export type PluginWorktreeContext = {
   worktreeId: string
@@ -19,6 +23,18 @@ export type PluginWorktreeContext = {
 export type PluginHostServices = {
   resolveActiveWorktreeContext(): Promise<PluginWorktreeContext | null>
   listWorktreeTerminals(worktreeId: string): Promise<{ id: string }[]>
+  hasEditorWorktreeLease(pluginId: string, worktreeId: string): boolean
+  readPluginWorkspaceDirectory(
+    worktreeId: string,
+    path: string,
+    maxEntries: number
+  ): Promise<unknown>
+  statPluginWorkspaceFiles(worktreeId: string, paths: readonly string[]): Promise<unknown[]>
+  readPluginWorkspaceFiles(
+    worktreeId: string,
+    paths: readonly string[],
+    maxFileBytes: number
+  ): Promise<unknown[]>
   sendTerminalText(
     terminalId: string,
     action: { text: string; enter: boolean }
@@ -68,6 +84,16 @@ function definePluginMethod(
   return [name, { spec, handler }]
 }
 
+function assertWorkspaceFileLease(
+  services: PluginHostServices,
+  pluginId: string,
+  worktreeId: string
+): void {
+  if (!services.hasEditorWorktreeLease(pluginId, worktreeId)) {
+    throw new Error('an active editor worktree lease is required')
+  }
+}
+
 const HANDLERS = new Map<string, BoundPluginHostMethod>([
   definePluginMethod('workspace.readContext', async (_params, { services }) => {
     const context = await services.resolveActiveWorktreeContext()
@@ -87,6 +113,31 @@ const HANDLERS = new Map<string, BoundPluginHostMethod>([
         )
         .slice(0, PLUGIN_WORKSPACE_TERMINAL_LIMIT)
         .map((terminal) => ({ id: terminal.id }))
+    }
+  }),
+  definePluginMethod('workspace.readDirectory', async (params, { pluginId, services }) => {
+    const { worktreeId, path } = params as { worktreeId: string; path: string }
+    assertWorkspaceFileLease(services, pluginId, worktreeId)
+    return services.readPluginWorkspaceDirectory(
+      worktreeId,
+      path,
+      PLUGIN_WORKSPACE_DIRECTORY_ENTRY_LIMIT
+    )
+  }),
+  definePluginMethod('workspace.statFiles', async (params, { pluginId, services }) => {
+    const { worktreeId, paths } = params as { worktreeId: string; paths: string[] }
+    assertWorkspaceFileLease(services, pluginId, worktreeId)
+    return { results: await services.statPluginWorkspaceFiles(worktreeId, paths) }
+  }),
+  definePluginMethod('workspace.readFiles', async (params, { pluginId, services }) => {
+    const { worktreeId, paths } = params as { worktreeId: string; paths: string[] }
+    assertWorkspaceFileLease(services, pluginId, worktreeId)
+    return {
+      results: await services.readPluginWorkspaceFiles(
+        worktreeId,
+        paths,
+        PLUGIN_WORKSPACE_FILE_MAX_BYTES
+      )
     }
   }),
   definePluginMethod('terminal.sendText', async (params, { services }) => {

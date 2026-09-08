@@ -1,6 +1,6 @@
-import { RuntimeFileCommandsWithSearchRemoteQuickOpenFilePaths } from './runtime-file-commands-search-remote-quick-open-file-paths'
+import { RuntimeFileCommandsWithPluginWorkspaceFiles } from './runtime-file-commands-plugin-workspace-files'
 
-export class RuntimeFileCommands extends RuntimeFileCommandsWithSearchRemoteQuickOpenFilePaths {}
+export class RuntimeFileCommands extends RuntimeFileCommandsWithPluginWorkspaceFiles {}
 export { RUNTIME_PREVIEWABLE_BINARY_MAX_BYTES } from './runtime-file-commands-mobile-file-list-limit'
 export { WINDOWS_RUNTIME_FILE_WATCH_CLOSE_DEADLINE_MS } from './runtime-file-commands-mobile-file-list-limit'
 export { awaitRuntimeFileWatcherUnsubscribes } from './runtime-file-watcher-leases'

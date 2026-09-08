@@ -37,3 +37,5 @@ export class PluginEditorWorktreeLeases {
     return this.documents.has(leaseKey(pluginKey, worktreeId))
   }
 }
+
+export const pluginEditorWorktreeLeases = new PluginEditorWorktreeLeases()

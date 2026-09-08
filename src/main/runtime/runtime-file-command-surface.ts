@@ -31,6 +31,9 @@ type RuntimeFileCommandName =
   | 'listRuntimeFiles'
   | 'listRuntimeMarkdownDocuments'
   | 'statRuntimeFile'
+  | 'readPluginWorkspaceDirectory'
+  | 'statPluginWorkspaceFiles'
+  | 'readPluginWorkspaceFiles'
 
 export type RuntimeFileCommandSurface = Pick<RuntimeFileCommands, RuntimeFileCommandName>
 
@@ -68,6 +71,9 @@ export function installRuntimeFileCommandSurface(
     searchRuntimeFiles: commands.searchRuntimeFiles.bind(commands),
     listRuntimeFiles: commands.listRuntimeFiles.bind(commands),
     listRuntimeMarkdownDocuments: commands.listRuntimeMarkdownDocuments.bind(commands),
-    statRuntimeFile: commands.statRuntimeFile.bind(commands)
+    statRuntimeFile: commands.statRuntimeFile.bind(commands),
+    readPluginWorkspaceDirectory: commands.readPluginWorkspaceDirectory.bind(commands),
+    statPluginWorkspaceFiles: commands.statPluginWorkspaceFiles.bind(commands),
+    readPluginWorkspaceFiles: commands.readPluginWorkspaceFiles.bind(commands)
   } satisfies RuntimeFileCommandSurface)
 }

@@ -11,6 +11,7 @@ import type {
 } from '../../shared/plugins/plugin-editor-protocol'
 import type { ValidDiscoveredPlugin } from './plugin-discovery'
 import { PluginEditorRouter, type RendererEditorDiagnosticsEvent } from './plugin-editor-router'
+import { pluginEditorWorktreeLeases } from './plugin-editor-worktree-leases'
 
 function plugin(
   pluginKey: string,
@@ -115,7 +116,8 @@ function request(version = 1) {
 }
 
 function harness(
-  entries: { plugin: ValidDiscoveredPlugin; providers: ReturnType<typeof provider>[] }[]
+  entries: { plugin: ValidDiscoveredPlugin; providers: ReturnType<typeof provider>[] }[],
+  options: { useDefaultLeases?: boolean } = {}
 ) {
   const registry = createPluginExtensionRegistry()
   const diagnostics: RendererEditorDiagnosticsEvent[] = []
@@ -147,7 +149,7 @@ function harness(
     ensurePlugin,
     registry,
     onDiagnostics: (event) => diagnostics.push(event),
-    leases
+    ...(options.useDefaultLeases ? {} : { leases })
   })
   return { router, ensurePlugin, diagnostics, leases }
 }
@@ -197,6 +199,21 @@ describe('PluginEditorRouter', () => {
     await router.open('renderer:1', document())
     router.revokePlugin('alpha.tools')
     expect(leases.revokePlugin).toHaveBeenCalledWith('alpha.tools')
+  })
+
+  it('uses the shared lease authority when no test authority is injected', async () => {
+    pluginEditorWorktreeLeases.revokePlugin('alpha.tools')
+    const subject = provider('ts')
+    const { router } = harness(
+      [{ plugin: plugin('alpha.tools', [contribution('ts')]), providers: [subject] }],
+      { useDefaultLeases: true }
+    )
+
+    await router.open('renderer:1', document())
+    expect(pluginEditorWorktreeLeases.has('alpha.tools', 'worktree-1')).toBe(true)
+
+    router.close('renderer:1', 'doc-1', 1)
+    expect(pluginEditorWorktreeLeases.has('alpha.tools', 'worktree-1')).toBe(false)
   })
 
   it('uses lexical plugin/provider order for one completion provider', async () => {

@@ -36,6 +36,20 @@ function createServices(): PluginHostServices {
     listWorktreeTerminals: vi
       .fn()
       .mockResolvedValue([{ id: TERMINAL_ID, title: '/home/private/orca' }]),
+    hasEditorWorktreeLease: vi.fn().mockReturnValue(true),
+    readPluginWorkspaceDirectory: vi
+      .fn()
+      .mockResolvedValue({ path: 'src', status: 'ok', entries: [] }),
+    statPluginWorkspaceFiles: vi
+      .fn()
+      .mockResolvedValue([
+        { path: 'src/index.ts', status: 'ok', type: 'file', byteLength: 3, mtimeMs: 1 }
+      ]),
+    readPluginWorkspaceFiles: vi
+      .fn()
+      .mockResolvedValue([
+        { path: 'src/index.ts', status: 'ok', content: 'abc', byteLength: 3, mtimeMs: 1 }
+      ]),
     sendTerminalText: vi.fn().mockResolvedValue({ accepted: true }),
     dispatchPluginNotification: vi.fn().mockResolvedValue({ delivered: true }),
     storage: {
@@ -106,6 +120,9 @@ function createAdapters(
 
 const successParams: Record<string, unknown> = {
   'workspace.readContext': {},
+  'workspace.readDirectory': { worktreeId: WORKTREE_ID, path: 'src' },
+  'workspace.statFiles': { worktreeId: WORKTREE_ID, paths: ['src/index.ts'] },
+  'workspace.readFiles': { worktreeId: WORKTREE_ID, paths: ['src/index.ts'] },
   'terminal.sendText': { terminalId: TERMINAL_ID, text: 'echo hi', enter: true },
   'notifications.show': { title: 'Hello' },
   'storage.get': { key: 'alpha' },
@@ -121,8 +138,8 @@ const successParams: Record<string, unknown> = {
 }
 
 describe('plugin host main/relay conformance', () => {
-  it('runs a granted success through both transports for all 13 v0 methods', async () => {
-    expect(PLUGIN_HOST_API_V0).toHaveLength(13)
+  it('runs a granted success through both transports for all 16 v0 methods', async () => {
+    expect(PLUGIN_HOST_API_V0).toHaveLength(16)
     expect(Object.keys(successParams).sort()).toEqual(
       PLUGIN_HOST_API_V0.map((entry) => entry.name).sort()
     )

@@ -4,12 +4,23 @@ import { describe, expect, it, vi } from 'vitest'
 import { PLUGIN_WORKSPACE_TERMINAL_LIMIT } from '../../shared/plugins/plugin-host-api'
 import { bindPluginHostServices, type PluginRuntimeDelegate } from './plugin-host-service-bindings'
 import { executePluginHostCall, type PluginHostServices } from './plugin-host-methods'
+import { pluginEditorWorktreeLeases } from './plugin-editor-worktree-leases'
 import { AgentSessionPtyWriteRefusedError } from '../../shared/agent-session-pty-write-admission'
+import {
+  PLUGIN_WORKSPACE_DIRECTORY_ENTRY_LIMIT,
+  PLUGIN_WORKSPACE_FILE_MAX_BYTES
+} from '../../shared/plugins/plugin-workspace-file-api'
 
 function createServices(storageSet: PluginHostServices['storage']['set']): PluginHostServices {
   return {
     resolveActiveWorktreeContext: vi.fn().mockResolvedValue(null),
     listWorktreeTerminals: vi.fn().mockResolvedValue([]),
+    hasEditorWorktreeLease: vi.fn().mockReturnValue(false),
+    readPluginWorkspaceDirectory: vi
+      .fn()
+      .mockResolvedValue({ path: '', status: 'ok', entries: [] }),
+    statPluginWorkspaceFiles: vi.fn().mockResolvedValue([]),
+    readPluginWorkspaceFiles: vi.fn().mockResolvedValue([]),
     sendTerminalText: vi.fn().mockResolvedValue({ accepted: true }),
     dispatchPluginNotification: vi.fn().mockResolvedValue({ delivered: true }),
     storage: {
@@ -262,5 +273,166 @@ describe('terminal.sendText under a refusing agent-session lease', () => {
 
     expect(outcome).toEqual({ ok: true, value: { accepted: true } })
     expect(delegate.sendTerminal).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('workspace file host service binding', () => {
+  it('shares router lease truth and delegates runtime workspace reads', async () => {
+    pluginEditorWorktreeLeases.revokePlugin('orca-samples.demo')
+    const { delegate } = createTerminalHarness([])
+    const statPluginWorkspaceFiles = vi.fn().mockResolvedValue([])
+    const readPluginWorkspaceDirectory = vi
+      .fn()
+      .mockResolvedValue({ path: 'src', status: 'ok', entries: [] })
+    const readPluginWorkspaceFiles = vi.fn().mockResolvedValue([])
+    Object.assign(delegate, {
+      statPluginWorkspaceFiles,
+      readPluginWorkspaceDirectory,
+      readPluginWorkspaceFiles
+    })
+    const services = bindPluginHostServices({
+      delegate,
+      pluginsDataDir: join(tmpdir(), 'plugin-host-workspace-binding-test'),
+      subscribeEvents: vi.fn().mockReturnValue([])
+    })
+
+    expect(services.hasEditorWorktreeLease('orca-samples.demo', 'wt-1')).toBe(false)
+    pluginEditorWorktreeLeases.acquire('orca-samples.demo', 'wt-1', 'renderer:1\0doc-1')
+    expect(services.hasEditorWorktreeLease('orca-samples.demo', 'wt-1')).toBe(true)
+
+    await services.statPluginWorkspaceFiles('wt-1', ['src/index.ts'])
+    await services.readPluginWorkspaceDirectory('wt-1', 'src', 2048)
+    await services.readPluginWorkspaceFiles('wt-1', ['src/index.ts'], 1024)
+    expect(statPluginWorkspaceFiles).toHaveBeenCalledWith('id:wt-1', ['src/index.ts'])
+    expect(readPluginWorkspaceDirectory).toHaveBeenCalledWith('id:wt-1', 'src', 2048)
+    expect(readPluginWorkspaceFiles).toHaveBeenCalledWith('id:wt-1', ['src/index.ts'], 1024)
+
+    pluginEditorWorktreeLeases.release('orca-samples.demo', 'wt-1', 'renderer:1\0doc-1')
+  })
+})
+
+describe('workspace file host methods', () => {
+  it('denies workspace source reads from panels and without capability', async () => {
+    const services = createServices(vi.fn().mockReturnValue({ ok: true }))
+    const panel = await executePluginHostCall({
+      pluginId: 'orca-samples.demo',
+      method: 'workspace.statFiles',
+      params: { worktreeId: 'wt-1', paths: ['src/index.ts'] },
+      viaPanel: true,
+      grantedCapabilities: ['workspace:readFiles'],
+      services
+    })
+    expect(panel).toMatchObject({ ok: false, code: 'panel_forbidden' })
+
+    const denied = await executePluginHostCall({
+      pluginId: 'orca-samples.demo',
+      method: 'workspace.statFiles',
+      params: { worktreeId: 'wt-1', paths: ['src/index.ts'] },
+      viaPanel: false,
+      grantedCapabilities: [],
+      services
+    })
+    expect(denied).toMatchObject({ ok: false, code: 'capability_denied' })
+  })
+
+  it('rejects a worker read when the editor router owns no lease', async () => {
+    const services = Object.assign(createServices(vi.fn().mockReturnValue({ ok: true })), {
+      hasEditorWorktreeLease: vi.fn(() => false),
+      statPluginWorkspaceFiles: vi.fn()
+    })
+    const outcome = await executePluginHostCall({
+      pluginId: 'orca-samples.demo',
+      method: 'workspace.statFiles',
+      params: { worktreeId: 'wt-1', paths: ['src/index.ts'] },
+      viaPanel: false,
+      grantedCapabilities: ['workspace:readFiles'],
+      services
+    })
+    expect(outcome).toMatchObject({ ok: false, code: 'action_failed' })
+    expect(outcome.ok ? '' : outcome.error).toMatch(/lease/i)
+    expect(services.statPluginWorkspaceFiles).not.toHaveBeenCalled()
+  })
+
+  it('routes a leased shallow directory read with its entry budget', async () => {
+    const readPluginWorkspaceDirectory = vi.fn().mockResolvedValue({
+      path: 'src',
+      status: 'ok',
+      entries: [{ name: 'index.ts', path: 'src/index.ts' }]
+    })
+    const services = Object.assign(createServices(vi.fn().mockReturnValue({ ok: true })), {
+      hasEditorWorktreeLease: vi.fn(() => true),
+      readPluginWorkspaceDirectory
+    })
+    const outcome = await executePluginHostCall({
+      pluginId: 'orca-samples.demo',
+      method: 'workspace.readDirectory',
+      params: { worktreeId: 'wt-1', path: 'src' },
+      viaPanel: false,
+      grantedCapabilities: ['workspace:readFiles'],
+      services
+    })
+    expect(outcome).toEqual({
+      ok: true,
+      value: { path: 'src', status: 'ok', entries: [{ name: 'index.ts', path: 'src/index.ts' }] }
+    })
+    expect(readPluginWorkspaceDirectory).toHaveBeenCalledWith(
+      'wt-1',
+      'src',
+      PLUGIN_WORKSPACE_DIRECTORY_ENTRY_LIMIT
+    )
+  })
+
+  it('routes leased stat and read calls through bounded runtime services', async () => {
+    const statPluginWorkspaceFiles = vi
+      .fn()
+      .mockResolvedValue([
+        { path: 'src/index.ts', status: 'ok', type: 'file', byteLength: 3, mtimeMs: 1 }
+      ])
+    const readPluginWorkspaceFiles = vi
+      .fn()
+      .mockResolvedValue([
+        { path: 'src/index.ts', status: 'ok', content: 'abc', byteLength: 3, mtimeMs: 1 }
+      ])
+    const services = Object.assign(createServices(vi.fn().mockReturnValue({ ok: true })), {
+      hasEditorWorktreeLease: vi.fn(() => true),
+      statPluginWorkspaceFiles,
+      readPluginWorkspaceFiles
+    })
+
+    const statOutcome = await executePluginHostCall({
+      pluginId: 'orca-samples.demo',
+      method: 'workspace.statFiles',
+      params: { worktreeId: 'wt-1', paths: ['src/index.ts'] },
+      viaPanel: false,
+      grantedCapabilities: ['workspace:readFiles'],
+      services
+    })
+    expect(statOutcome).toEqual({
+      ok: true,
+      value: {
+        results: [{ path: 'src/index.ts', status: 'ok', type: 'file', byteLength: 3, mtimeMs: 1 }]
+      }
+    })
+    expect(statPluginWorkspaceFiles).toHaveBeenCalledWith('wt-1', ['src/index.ts'])
+
+    const readOutcome = await executePluginHostCall({
+      pluginId: 'orca-samples.demo',
+      method: 'workspace.readFiles',
+      params: { worktreeId: 'wt-1', paths: ['src/index.ts'] },
+      viaPanel: false,
+      grantedCapabilities: ['workspace:readFiles'],
+      services
+    })
+    expect(readOutcome).toEqual({
+      ok: true,
+      value: {
+        results: [{ path: 'src/index.ts', status: 'ok', content: 'abc', byteLength: 3, mtimeMs: 1 }]
+      }
+    })
+    expect(readPluginWorkspaceFiles).toHaveBeenCalledWith(
+      'wt-1',
+      ['src/index.ts'],
+      PLUGIN_WORKSPACE_FILE_MAX_BYTES
+    )
   })
 })

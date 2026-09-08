@@ -7,7 +7,7 @@ import type {
 } from '../../shared/plugins/plugin-editor-protocol'
 import { PLUGIN_EDITOR_PROVIDER_EXTENSION_POINT } from '../../shared/plugins/plugin-extension-registry'
 import { matchingEditorProviderGroups } from './plugin-editor-router-candidates'
-import { PluginEditorWorktreeLeases } from './plugin-editor-worktree-leases'
+import { pluginEditorWorktreeLeases } from './plugin-editor-worktree-leases'
 import type {
   BoundProvider,
   DocumentState,
@@ -36,7 +36,7 @@ export class PluginEditorRouter {
   private readonly pendingCompletions = new Map<string, PendingCompletion>()
 
   constructor(private readonly options: PluginEditorRouterOptions) {
-    this.leases = options.leases ?? new PluginEditorWorktreeLeases()
+    this.leases = options.leases ?? pluginEditorWorktreeLeases
   }
 
   async open(ownerKey: string, document: EditorDocumentOpen): Promise<EditorProviderBinding[]> {
