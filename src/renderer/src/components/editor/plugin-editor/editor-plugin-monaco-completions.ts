@@ -45,6 +45,9 @@ function completionKind(
 ): languages.CompletionItemKind {
   const kinds = monaco.languages.CompletionItemKind
   switch (kind) {
+    case undefined:
+    case 'text':
+      return kinds.Text
     case 'method':
       return kinds.Method
     case 'function':
@@ -93,8 +96,6 @@ function completionKind(
       return kinds.Operator
     case 'typeParameter':
       return kinds.TypeParameter
-    default:
-      return kinds.Text
   }
 }
 
