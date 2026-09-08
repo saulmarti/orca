@@ -3,6 +3,7 @@ import type { PluginEventName } from '../../shared/plugins/plugin-manifest'
 import type { PluginPanelActionOutcome } from '../../shared/plugins/plugin-panel-bridge'
 import {
   PLUGIN_COMMAND_EXTENSION_POINT,
+  PLUGIN_EDITOR_PROVIDER_EXTENSION_POINT,
   type PluginExtensionRegistry
 } from '../../shared/plugins/plugin-extension-registry'
 import type { ValidDiscoveredPlugin } from './plugin-discovery'
@@ -97,8 +98,20 @@ export class PluginWorkerController {
           `plugin ${plugin.pluginKey} registered undeclared command ${undeclaredCommand}`
         )
       }
+      const declaredEditorProviders = new Set(
+        plugin.manifest.contributes.editorProviders.map((provider) => provider.id)
+      )
+      const undeclaredEditorProvider = handle.editorProviders.find(
+        (providerId) => !declaredEditorProviders.has(providerId)
+      )
+      if (undeclaredEditorProvider) {
+        await this.manager.deactivate(plugin.pluginKey)
+        throw new Error(
+          `plugin ${plugin.pluginKey} registered undeclared editor provider ${undeclaredEditorProvider}`
+        )
+      }
       this.activationErrors.delete(plugin.pluginKey)
-      this.registerCommands(plugin, spec, handle.commands)
+      this.registerExtensions(plugin, spec, handle)
       return handle
     } catch (error) {
       this.activationErrors.set(
@@ -149,13 +162,13 @@ export class PluginWorkerController {
     return this.manager.disposeAll()
   }
 
-  private registerCommands(
+  private registerExtensions(
     plugin: ValidDiscoveredPlugin,
     spec: PluginWorkerSpawnSpec,
-    commands: readonly string[]
+    handle: PluginWorkerHandle
   ): void {
     this.options.registry.clearPlugin(plugin.pluginKey)
-    for (const commandId of commands) {
+    for (const commandId of handle.commands) {
       this.options.registry.register(
         PLUGIN_COMMAND_EXTENSION_POINT,
         plugin.pluginKey,
@@ -164,6 +177,36 @@ export class PluginWorkerController {
           invoke: (args) => this.options.invokeCommand(plugin.pluginKey, commandId, args)
         },
         commandId
+      )
+    }
+    const contributions = new Map(
+      plugin.manifest.contributes.editorProviders.map((provider) => [provider.id, provider])
+    )
+    for (const providerId of handle.editorProviders) {
+      const contribution = contributions.get(providerId)
+      if (!contribution) {
+        continue
+      }
+      this.options.registry.register(
+        PLUGIN_EDITOR_PROVIDER_EXTENSION_POINT,
+        plugin.pluginKey,
+        {
+          providerId,
+          languages: contribution.languages,
+          features: contribution.features,
+          openDocument: (document) => handle.openEditorDocument(providerId, document),
+          changeDocument: (change) => handle.changeEditorDocument(providerId, change),
+          closeDocument: (document) => handle.closeEditorDocument(providerId, document),
+          provideCompletions: (request) => handle.requestEditorCompletion(providerId, request),
+          cancel: (requestId) => handle.cancelEditorRequest(requestId),
+          onDiagnostics: (callback) =>
+            handle.onEditorDiagnostics((incomingProviderId, publication) => {
+              if (incomingProviderId === providerId) {
+                callback(publication)
+              }
+            })
+        },
+        providerId
       )
     }
     this.registeredSpecs.set(plugin.pluginKey, spec)

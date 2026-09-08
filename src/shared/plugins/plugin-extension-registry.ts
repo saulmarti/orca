@@ -1,3 +1,13 @@
+import type { PluginEditorProviderFeature } from './plugin-editor-contributions'
+import type {
+  EditorCompletionRequest,
+  EditorCompletionResponse,
+  EditorDiagnosticsPublication,
+  EditorDocumentChange,
+  EditorDocumentClose,
+  EditorDocumentOpen
+} from './plugin-editor-protocol'
+
 /**
  * Typed extension-point registry. An extension point is a named, typed slot
  * (like a Go interface value); plugins register implementations and hosts
@@ -36,6 +46,23 @@ export const PLUGIN_COMMAND_EXTENSION_POINT = definePluginExtensionPoint<PluginW
   'command',
   { experimental: true }
 )
+
+export type PluginEditorProviderExtension = {
+  readonly providerId: string
+  readonly languages: readonly string[]
+  readonly features: readonly PluginEditorProviderFeature[]
+  openDocument(document: EditorDocumentOpen): void
+  changeDocument(change: EditorDocumentChange): void
+  closeDocument(document: EditorDocumentClose): void
+  provideCompletions(request: EditorCompletionRequest): Promise<EditorCompletionResponse>
+  cancel(requestId: string): void
+  onDiagnostics(callback: (publication: EditorDiagnosticsPublication) => void): () => void
+}
+
+export const PLUGIN_EDITOR_PROVIDER_EXTENSION_POINT =
+  definePluginExtensionPoint<PluginEditorProviderExtension>('editorProvider', {
+    experimental: true
+  })
 
 export type PluginExtensionRegistration<T> = {
   pluginId: string
