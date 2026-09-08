@@ -11,6 +11,7 @@ type ContributionValidationManifest = {
     panels: IdentifiedContribution[]
     commands: (IdentifiedContribution & { action?: string; context?: 'global' | 'worktree' })[]
     events: { on: string }[]
+    editorProviders: IdentifiedContribution[]
     languagePacks: { locale: string }[]
     keybindings: { command: string; key: string; when?: 'global' | 'worktree' }[]
     vmRecipes: PathContribution[]
@@ -44,7 +45,7 @@ export function validatePluginManifestContributions(
   manifest: ContributionValidationManifest,
   ctx: RefinementCtx
 ): void {
-  for (const path of ['panels', 'commands'] as const) {
+  for (const path of ['panels', 'commands', 'editorProviders'] as const) {
     rejectDuplicateValues(
       manifest.contributes[path],
       (entry) => (entry as IdentifiedContribution).id,
@@ -131,6 +132,13 @@ export function validatePluginManifestContributions(
       message: 'required when contributes.events is non-empty'
     })
   }
+  if (!manifest.main && manifest.contributes.editorProviders.length > 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['main'],
+      message: 'required when contributes.editorProviders is non-empty'
+    })
+  }
   if (
     manifest.contributes.events.length > 0 &&
     !manifest.capabilities.some((capability) => capability.kind === 'events:subscribe')
@@ -139,6 +147,17 @@ export function validatePluginManifestContributions(
       code: 'custom',
       path: ['capabilities'],
       message: 'events:subscribe capability required when contributes.events is non-empty'
+    })
+  }
+  if (
+    manifest.contributes.editorProviders.length > 0 &&
+    !manifest.capabilities.some((capability) => capability.kind === 'editor:languageService')
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['capabilities'],
+      message:
+        'editor:languageService capability required when contributes.editorProviders is non-empty'
     })
   }
 }
