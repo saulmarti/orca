@@ -1,8 +1,8 @@
 # Orca Editor Provider API Design
 
-**Date:** 2026-09-08  
-**Status:** Approved architecture, pending written-spec review  
-**Target:** `stablyai/orca`  
+**Date:** 2026-09-08
+**Status:** Approved architecture, pending written-spec review
+**Target:** `stablyai/orca`
 **Scope:** Plugin-facing editor language-service bridge for real-time completions and diagnostics.
 
 ## 1. Goal
