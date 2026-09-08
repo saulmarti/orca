@@ -13,6 +13,7 @@ import { clampMonacoAutoHeight } from './monaco-auto-height'
 import { installMonacoE2EProbe } from './monaco-e2e-probe'
 import { matchesPendingEditorFocusRequest } from './pending-editor-focus-request'
 import { installMonacoEditorInputBindings } from './monaco-editor-input-bindings'
+import { attachEditorPluginBridge } from './plugin-editor/editor-plugin-bridge'
 import type { MonacoEditorMountParams } from './monaco-editor-mount-params'
 import {
   installMonacoViewStateTracking,
@@ -114,6 +115,16 @@ export function useMonacoEditorMount(params: MonacoEditorMountParams): OnMount {
         endProgrammaticContentSync(filePath)
       }
 
+      const editorPluginBridge = worktreeId
+        ? attachEditorPluginBridge({
+            editorInstance,
+            monaco,
+            worktreeId,
+            filePath,
+            languageId: languageRef.current
+          })
+        : null
+
       setupCopy(editorInstance, monaco, filePath, propsRef)
       unregisterFileSearchSelectionRef.current?.()
       unregisterFileSearchSelectionRef.current = registerFileSearchSelectedTextProvider(() => {
@@ -172,6 +183,7 @@ export function useMonacoEditorMount(params: MonacoEditorMountParams): OnMount {
         scrollStateSub.dispose()
         gutterMouseDownSub.dispose()
         disposeInputBindings()
+        editorPluginBridge?.dispose()
         autoHeightSub?.dispose()
         if (autoHeightFrame !== null) {
           window.cancelAnimationFrame(autoHeightFrame)
