@@ -3,8 +3,8 @@ import type { DocumentStore } from './document-store'
 export const DEFAULT_PROJECT_TEXT_BUDGET = 32 * 1024 * 1024
 export const DEFAULT_WORKER_TEXT_BUDGET = 128 * 1024 * 1024
 
-type FileInput = { text: string; byteLength: number; mtimeMs: number }
-type FileRecord = FileInput & {
+export type WorkspaceFileInput = { text: string; byteLength: number; mtimeMs: number }
+type FileRecord = WorkspaceFileInput & {
   status: 'file'
   scriptVersion: number
   projectKeys: Set<string>
@@ -43,7 +43,12 @@ export class WorkspaceFileCache {
     this.records.set(key, { status: 'missing', projectKeys, lastUsed: ++this.clock })
   }
 
-  setFile(projectKey: string, worktreeId: string, relativePath: string, input: FileInput): void {
+  setFile(
+    projectKey: string,
+    worktreeId: string,
+    relativePath: string,
+    input: WorkspaceFileInput
+  ): boolean {
     const key = pathKey(worktreeId, relativePath)
     const current = this.records.get(key)
     const projectKeys = current?.projectKeys ?? new Set<string>()
@@ -60,6 +65,7 @@ export class WorkspaceFileCache {
     })
     this.enforceProjectBudget(projectKey)
     this.enforceWorkerBudget()
+    return changed
   }
 
   getDisk(worktreeId: string, relativePath: string): CachedDiskRecord | undefined {

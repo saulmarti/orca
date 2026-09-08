@@ -2,7 +2,7 @@ import type * as ts from '@typescript/typescript6'
 import type { DocumentStore } from './document-store'
 import type { ProjectResolution } from './project-resolver'
 import { TypeScriptProject } from './typescript-project'
-import type { WorkspaceFileCache } from './workspace-file-cache'
+import type { WorkspaceFileCache, WorkspaceFileInput } from './workspace-file-cache'
 
 type ProjectManagerOptions = {
   documents: DocumentStore
@@ -55,6 +55,18 @@ export class ProjectManager {
 
   noteDocumentChange(projectKey: string): void {
     this.projects.get(projectKey)?.noteDocumentChange()
+  }
+
+  refreshDependency(projectKey: string, relativePath: string, input: WorkspaceFileInput): boolean {
+    const project = this.projects.get(projectKey)
+    if (!project) {
+      return false
+    }
+    const changed = this.options.cache.setFile(projectKey, project.worktreeId, relativePath, input)
+    if (changed) {
+      project.noteDependencyChange()
+    }
+    return changed
   }
 
   invalidate(projectKey: string): void {

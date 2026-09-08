@@ -124,6 +124,20 @@ export class TypeScriptProject {
     })
   }
 
+  getSyntacticDiagnostics(relativePath: string): readonly ts.Diagnostic[] {
+    this.assertActive()
+    return this.languageService.getSyntacticDiagnostics(virtualFileName(relativePath))
+  }
+
+  getSemanticDiagnostics(relativePath: string): readonly ts.Diagnostic[] {
+    this.assertActive()
+    return this.languageService.getSemanticDiagnostics(virtualFileName(relativePath))
+  }
+
+  noteDependencyChange(): void {
+    this.noteDocumentChange()
+  }
+
   getText(relativePath: string): string | undefined {
     return (
       this.documents.getOpenByPath(this.worktreeId, relativePath)?.text ??

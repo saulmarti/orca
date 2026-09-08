@@ -59,3 +59,60 @@ describe('ProjectManager', () => {
     expect(second.languageService).not.toBe(first.languageService)
   })
 })
+
+describe('ProjectManager dependency invalidation', () => {
+  it('refreshes a closed dependency without recreating the LanguageService', () => {
+    const documents = new DocumentStore()
+    const cache = new WorkspaceFileCache()
+    const manager = new ProjectManager({ documents, cache })
+    cache.setFile(resolution.key, 'wt-1', 'src/user.ts', {
+      text: 'export interface User { name: string }',
+      byteLength: 38,
+      mtimeMs: 1
+    })
+    cache.setFile(resolution.key, 'wt-1', 'src/example.ts', {
+      text: "import type { User } from './user'\nconst user: User = { name: 'x' }",
+      byteLength: 70,
+      mtimeMs: 1
+    })
+    const project = manager.getOrCreate({
+      resolution,
+      rootFiles: ['src/user.ts', 'src/example.ts']
+    })
+    const service = project.languageService
+    expect(project.getSemanticDiagnostics('src/example.ts')).toEqual([])
+
+    const changed = manager.refreshDependency(resolution.key, 'src/user.ts', {
+      text: 'export interface User { name: string; email: string }',
+      byteLength: 53,
+      mtimeMs: 2
+    })
+
+    expect(changed).toBe(true)
+    expect(project.languageService).toBe(service)
+    expect(project.getSemanticDiagnostics('src/example.ts').length).toBeGreaterThan(0)
+  })
+
+  it('invalidates only the configured project whose boundary changed', () => {
+    const documents = new DocumentStore()
+    const cache = new WorkspaceFileCache()
+    const manager = new ProjectManager({ documents, cache })
+    const otherResolution = {
+      kind: 'configured' as const,
+      configRelativePath: 'packages/b/tsconfig.json',
+      key: 'wt-1\u0000config:packages/b/tsconfig.json'
+    }
+    const first = manager.getOrCreate({ resolution, rootFiles: ['src/example.ts'] })
+    const other = manager.getOrCreate({
+      resolution: otherResolution,
+      rootFiles: ['packages/b/index.ts']
+    })
+
+    manager.invalidate(resolution.key)
+
+    expect(manager.getOrCreate({ resolution, rootFiles: ['src/example.ts'] })).not.toBe(first)
+    expect(
+      manager.getOrCreate({ resolution: otherResolution, rootFiles: ['packages/b/index.ts'] })
+    ).toBe(other)
+  })
+})
