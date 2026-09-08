@@ -1,0 +1,21 @@
+{
+  "manifestVersion": 1,
+  "id": "editor-provider-fixture",
+  "publisher": "orca-samples",
+  "name": "Editor Provider Fixture",
+  "version": "1.0.0",
+  "description": "Deterministic completion and diagnostics fixture for editor-provider E2E coverage.",
+  "engines": { "orca": ">=1.4.0" },
+  "pluginApi": 1,
+  "main": "worker.mjs",
+  "contributes": {
+    "editorProviders": [
+      {
+        "id": "typescript",
+        "languages": ["typescript"],
+        "features": ["completion", "diagnostics"]
+      }
+    ]
+  },
+  "capabilities": [{ "kind": "editor:languageService" }]
+}
