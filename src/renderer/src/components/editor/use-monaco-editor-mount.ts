@@ -121,6 +121,7 @@ export function useMonacoEditorMount(params: MonacoEditorMountParams): OnMount {
             monaco,
             worktreeId,
             filePath,
+            relativePath: propsRef.current.relativePath,
             languageId: languageRef.current
           })
         : null

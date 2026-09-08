@@ -30,6 +30,21 @@ const diagnostic = {
 }
 
 describe('plugin editor protocol boundaries', () => {
+  it('requires a bounded workspace-relative path on document open', () => {
+    const base = {
+      documentId: 'doc-1',
+      worktreeId: 'worktree-1',
+      filePath: '/repo/src/index.ts',
+      languageId: 'typescript',
+      version: 1,
+      text: ''
+    }
+    expect(editorDocumentOpenSchema.safeParse(base).success).toBe(false)
+    expect(
+      editorDocumentOpenSchema.safeParse({ ...base, relativePath: 'src/index.ts' }).success
+    ).toBe(true)
+  })
+
   it('uses nonnegative positions and positive document versions', () => {
     expect(editorPositionSchema.safeParse({ line: 0, character: 0 }).success).toBe(true)
     expect(editorPositionSchema.safeParse({ line: -1, character: 0 }).success).toBe(false)

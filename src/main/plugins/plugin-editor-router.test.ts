@@ -97,6 +97,7 @@ function document(version = 1) {
     documentId: 'doc-1',
     worktreeId: 'worktree-1',
     filePath: 'src/index.ts',
+    relativePath: 'src/index.ts',
     languageId: 'typescript',
     version,
     text: 'const value = 1'

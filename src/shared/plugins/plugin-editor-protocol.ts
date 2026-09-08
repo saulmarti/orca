@@ -38,6 +38,7 @@ const editorDocumentDescriptorSchema = z
     documentId: opaqueIdSchema,
     worktreeId: opaqueIdSchema,
     filePath: filePathSchema,
+    relativePath: filePathSchema,
     languageId: languageIdSchema,
     version: documentVersionSchema
   })
