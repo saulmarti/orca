@@ -158,7 +158,7 @@ Plugin SDK adds:
 ```ts
 editor: {
   registerProvider(providerId: string, provider: PluginEditorProvider): { dispose(): void }
-  publishDiagnostics(publication: EditorDiagnosticsPublication): void
+  publishDiagnostics(providerId: string, publication: EditorDiagnosticsPublication): void
 }
 ```
 

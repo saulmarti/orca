@@ -5,6 +5,11 @@ import {
   type PluginWorkerChildMessage
 } from '../../shared/plugins/plugin-host-protocol'
 import type { PluginEventName } from '../../shared/plugins/plugin-manifest'
+import {
+  createPluginHostEditorRuntime,
+  type PluginHostEditorRuntime,
+  type PluginWorkerEditorApi
+} from './plugin-host-editor-runtime'
 
 /**
  * Message-loop core of the out-of-process plugin worker. Electron-free and
@@ -26,6 +31,8 @@ export type PluginWorkerOrcaApi = {
   events: {
     on(event: PluginEventName, handler: (payload: unknown) => void | Promise<void>): void
   }
+  /** Register worker-backed editor providers and publish versioned diagnostics. */
+  editor: PluginWorkerEditorApi
   /** Call a host API method (capability-gated host-side). */
   host: {
     call(method: string, params?: unknown): Promise<unknown>
@@ -65,6 +72,14 @@ export function createPluginWorkerRuntime(
   let initialized = false
   let shuttingDown = false
   let deactivate: (() => unknown) | null = null
+  let editorRuntime: PluginHostEditorRuntime | null = null
+
+  function editorOrWarn(): PluginHostEditorRuntime | null {
+    if (!editorRuntime) {
+      send({ type: 'log', level: 'warn', message: 'ignoring editor message before worker init' })
+    }
+    return editorRuntime
+  }
 
   async function handleInit(input: {
     pluginRoot: string
@@ -89,6 +104,10 @@ export function createPluginWorkerRuntime(
       throw new Error(`plugin entry ${input.mainEntry} has a non-function deactivate export`)
     }
     deactivate = (module.deactivate as (() => unknown) | undefined) ?? null
+    editorRuntime = createPluginHostEditorRuntime({
+      send,
+      grantedCapabilities: input.grantedCapabilities
+    })
     const orca: PluginWorkerOrcaApi = {
       commands: {
         register(commandId, handler) {
@@ -102,6 +121,7 @@ export function createPluginWorkerRuntime(
           eventHandlers.set(event, handlers)
         }
       },
+      editor: editorRuntime.api,
       host: {
         call(method, params) {
           const callId = nextHostCallId++
@@ -117,7 +137,11 @@ export function createPluginWorkerRuntime(
       }
     }
     await activate(orca)
-    send({ type: 'ready', commands: [...commandHandlers.keys()] })
+    send({
+      type: 'ready',
+      commands: [...commandHandlers.keys()],
+      editorProviders: editorRuntime.providerIds()
+    })
   }
 
   return {
@@ -185,11 +209,32 @@ export function createPluginWorkerRuntime(
             }
             return
           }
+          case 'editorDocumentOpen': {
+            await editorOrWarn()?.openDocument(message.providerId, message.document)
+            return
+          }
+          case 'editorDocumentChange': {
+            await editorOrWarn()?.changeDocument(message.providerId, message.change)
+            return
+          }
+          case 'editorDocumentClose': {
+            await editorOrWarn()?.closeDocument(message.providerId, message.document)
+            return
+          }
+          case 'editorCompletionRequest': {
+            await editorOrWarn()?.complete(message.providerId, message.request)
+            return
+          }
+          case 'editorCancelRequest': {
+            editorOrWarn()?.cancel(message.requestId)
+            return
+          }
           case 'shutdown': {
             if (shuttingDown) {
               return
             }
             shuttingDown = true
+            editorRuntime?.abortAll()
             try {
               await deactivate?.()
             } catch (error) {
@@ -208,3 +253,5 @@ export function createPluginWorkerRuntime(
     }
   }
 }
+
+export type { PluginDisposable, PluginEditorProvider } from './plugin-host-editor-runtime'

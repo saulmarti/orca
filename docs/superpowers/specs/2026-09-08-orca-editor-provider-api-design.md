@@ -367,7 +367,7 @@ type PluginWorkerOrcaApi = {
       providerId: string,
       provider: PluginEditorProvider
     ): PluginDisposable
-    publishDiagnostics(publication: EditorDiagnosticsPublication): void
+    publishDiagnostics(providerId: string, publication: EditorDiagnosticsPublication): void
   }
   grantedCapabilities: readonly string[]
   log(message: string): void
@@ -611,7 +611,7 @@ EditorDocumentOpen    → textDocument/didOpen
 EditorDocumentChange  → textDocument/didChange
 EditorDocumentClose   → textDocument/didClose
 CompletionRequest     → textDocument/completion
-LSP diagnostics       → publishDiagnostics()
+LSP diagnostics       → publishDiagnostics(providerId, publication)
 ```
 
 Language-server process execution will require a separately designed capability such as a scoped `process:exec`; it must not be smuggled into `editor:languageService`.

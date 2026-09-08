@@ -1,5 +1,16 @@
 import { z } from 'zod'
+import { PLUGIN_EDITOR_PROVIDER_LIMIT } from './plugin-editor-contributions'
+import {
+  editorCancelRequestSchema,
+  editorCompletionRequestSchema,
+  editorCompletionResponseSchema,
+  editorDiagnosticsPublicationSchema,
+  editorDocumentChangeSchema,
+  editorDocumentCloseSchema,
+  editorDocumentOpenSchema
+} from './plugin-editor-protocol'
 import { PLUGIN_COMMAND_LIMIT, PLUGIN_EVENT_NAMES, pluginCommandIdSchema } from './plugin-manifest'
+import { pluginIdSchema } from './plugin-manifest-fields'
 import { PLUGIN_CAPABILITY_KINDS } from './plugin-capabilities'
 
 /**
@@ -42,6 +53,34 @@ export const pluginWorkerHostResultSchema = z.object({
   error: z.string().optional()
 })
 
+export const pluginWorkerEditorDocumentOpenSchema = z.object({
+  type: z.literal('editorDocumentOpen'),
+  providerId: pluginIdSchema,
+  document: editorDocumentOpenSchema
+})
+
+export const pluginWorkerEditorDocumentChangeSchema = z.object({
+  type: z.literal('editorDocumentChange'),
+  providerId: pluginIdSchema,
+  change: editorDocumentChangeSchema
+})
+
+export const pluginWorkerEditorDocumentCloseSchema = z.object({
+  type: z.literal('editorDocumentClose'),
+  providerId: pluginIdSchema,
+  document: editorDocumentCloseSchema
+})
+
+export const pluginWorkerEditorCompletionRequestSchema = z.object({
+  type: z.literal('editorCompletionRequest'),
+  providerId: pluginIdSchema,
+  request: editorCompletionRequestSchema
+})
+
+export const pluginWorkerEditorCancelRequestSchema = editorCancelRequestSchema.extend({
+  type: z.literal('editorCancelRequest')
+})
+
 export const pluginWorkerShutdownSchema = z.object({ type: z.literal('shutdown') })
 
 export const pluginWorkerParentMessageSchema = z.discriminatedUnion('type', [
@@ -49,13 +88,20 @@ export const pluginWorkerParentMessageSchema = z.discriminatedUnion('type', [
   pluginWorkerInvokeCommandSchema,
   pluginWorkerDeliverEventSchema,
   pluginWorkerHostResultSchema,
+  pluginWorkerEditorDocumentOpenSchema,
+  pluginWorkerEditorDocumentChangeSchema,
+  pluginWorkerEditorDocumentCloseSchema,
+  pluginWorkerEditorCompletionRequestSchema,
+  pluginWorkerEditorCancelRequestSchema,
   pluginWorkerShutdownSchema
 ])
 
 export const pluginWorkerReadySchema = z.object({
   type: z.literal('ready'),
   /** Command ids the worker registered handlers for (⊆ manifest commands). */
-  commands: z.array(pluginCommandIdSchema).max(PLUGIN_COMMAND_LIMIT)
+  commands: z.array(pluginCommandIdSchema).max(PLUGIN_COMMAND_LIMIT),
+  /** Editor provider ids registered by the worker (⊆ manifest providers). */
+  editorProviders: z.array(pluginIdSchema).max(PLUGIN_EDITOR_PROVIDER_LIMIT).default([])
 })
 
 export const pluginWorkerCommandResultSchema = z.object({
@@ -81,6 +127,41 @@ export const pluginWorkerHostCallSchema = z.object({
   params: z.unknown().optional()
 })
 
+export const pluginWorkerEditorCompletionResultSchema = z
+  .object({
+    type: z.literal('editorCompletionResult'),
+    providerId: pluginIdSchema,
+    requestId: z.string().min(1).max(256),
+    ok: z.boolean(),
+    response: editorCompletionResponseSchema.optional(),
+    error: z.string().max(8192).optional()
+  })
+  .superRefine((message, ctx) => {
+    if (message.ok && !message.response) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['response'],
+        message: 'required for successful result'
+      })
+    }
+    if (!message.ok && !message.error) {
+      ctx.addIssue({ code: 'custom', path: ['error'], message: 'required for failed result' })
+    }
+    if (message.response && message.response.requestId !== message.requestId) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['response', 'requestId'],
+        message: 'must match requestId'
+      })
+    }
+  })
+
+export const pluginWorkerEditorDiagnosticsSchema = z.object({
+  type: z.literal('editorDiagnostics'),
+  providerId: pluginIdSchema,
+  publication: editorDiagnosticsPublicationSchema
+})
+
 export const pluginWorkerLogSchema = z.object({
   type: z.literal('log'),
   level: z.enum(['info', 'warn', 'error']),
@@ -97,6 +178,8 @@ export const pluginWorkerChildMessageSchema = z.discriminatedUnion('type', [
   pluginWorkerCommandResultSchema,
   pluginWorkerEventAckSchema,
   pluginWorkerHostCallSchema,
+  pluginWorkerEditorCompletionResultSchema,
+  pluginWorkerEditorDiagnosticsSchema,
   pluginWorkerLogSchema,
   pluginWorkerFatalSchema
 ])
