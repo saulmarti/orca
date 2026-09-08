@@ -1,0 +1,71 @@
+import type * as ts from '@typescript/typescript6'
+import type { DocumentStore } from './document-store'
+import type { ProjectResolution } from './project-resolver'
+import { TypeScriptProject } from './typescript-project'
+import type { WorkspaceFileCache } from './workspace-file-cache'
+
+type ProjectManagerOptions = {
+  documents: DocumentStore
+  cache: WorkspaceFileCache
+}
+
+type GetOrCreateProjectOptions = {
+  resolution: ProjectResolution
+  rootFiles: string[]
+  compilerOptions?: ts.CompilerOptions
+}
+
+function worktreeIdFromKey(key: string): string {
+  const separator = key.indexOf('\u0000')
+  if (separator === -1) {
+    throw new Error(`invalid project key ${key}`)
+  }
+  return key.slice(0, separator)
+}
+
+function projectRoot(resolution: ProjectResolution): string {
+  if (resolution.kind === 'inferred') {
+    return resolution.rootRelativePath
+  }
+  const slash = resolution.configRelativePath.lastIndexOf('/')
+  return slash === -1 ? '' : resolution.configRelativePath.slice(0, slash)
+}
+export class ProjectManager {
+  private readonly projects = new Map<string, TypeScriptProject>()
+
+  constructor(private readonly options: ProjectManagerOptions) {}
+
+  getOrCreate(options: GetOrCreateProjectOptions): TypeScriptProject {
+    const existing = this.projects.get(options.resolution.key)
+    if (existing) {
+      return existing
+    }
+    const project = new TypeScriptProject({
+      key: options.resolution.key,
+      worktreeId: worktreeIdFromKey(options.resolution.key),
+      rootRelativePath: projectRoot(options.resolution),
+      documents: this.options.documents,
+      cache: this.options.cache,
+      rootFiles: options.rootFiles,
+      ...(options.compilerOptions ? { compilerOptions: options.compilerOptions } : {})
+    })
+    this.projects.set(options.resolution.key, project)
+    return project
+  }
+
+  noteDocumentChange(projectKey: string): void {
+    this.projects.get(projectKey)?.noteDocumentChange()
+  }
+
+  invalidate(projectKey: string): void {
+    this.projects.get(projectKey)?.dispose()
+    this.projects.delete(projectKey)
+  }
+
+  dispose(): void {
+    for (const project of this.projects.values()) {
+      project.dispose()
+    }
+    this.projects.clear()
+  }
+}
