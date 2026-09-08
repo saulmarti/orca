@@ -37,6 +37,29 @@ describe('pluginManifestSchema boundaries', () => {
     expect(result).toMatchObject({ ok: true })
   })
 
+  it('accepts an editor provider with language-service consent', () => {
+    const result = parsePluginManifest(
+      manifest({
+        main: 'worker.mjs',
+        contributes: {
+          panels: [],
+          commands: [],
+          events: [],
+          editorProviders: [
+            {
+              id: 'typescript',
+              languages: ['typescript', 'javascript'],
+              features: ['completion', 'diagnostics']
+            }
+          ]
+        },
+        capabilities: [{ kind: 'editor:languageService' }]
+      })
+    )
+
+    expect(result).toMatchObject({ ok: true })
+  })
+
   it('rejects oversized identities and invalid semantic versions', () => {
     expect(parsePluginManifest(manifest({ id: 'a'.repeat(PLUGIN_ID_MAX_LENGTH + 1) })).ok).toBe(
       false
