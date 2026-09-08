@@ -119,6 +119,12 @@ function harness(
 ) {
   const registry = createPluginExtensionRegistry()
   const diagnostics: RendererEditorDiagnosticsEvent[] = []
+  const leases = {
+    acquire: vi.fn(),
+    release: vi.fn(),
+    revokePlugin: vi.fn(),
+    has: vi.fn(() => false)
+  }
   const activated = new Set<string>()
   const ensurePlugin = vi.fn(async (subject: ValidDiscoveredPlugin) => {
     if (activated.has(subject.pluginKey)) {
@@ -140,9 +146,10 @@ function harness(
     getGrantedCapabilities: () => ['editor:languageService'],
     ensurePlugin,
     registry,
-    onDiagnostics: (event) => diagnostics.push(event)
+    onDiagnostics: (event) => diagnostics.push(event),
+    leases
   })
-  return { router, ensurePlugin, diagnostics }
+  return { router, ensurePlugin, diagnostics, leases }
 }
 
 describe('PluginEditorRouter', () => {
@@ -165,6 +172,31 @@ describe('PluginEditorRouter', () => {
     expect(bindings).toEqual([
       { pluginKey: 'alpha.tools', providerId: 'ts', features: ['completion', 'diagnostics'] }
     ])
+  })
+
+  it('acquires, releases, and revokes router-derived editor worktree leases', async () => {
+    const subject = provider('ts')
+    const { router, leases } = harness([
+      { plugin: plugin('alpha.tools', [contribution('ts')]), providers: [subject] }
+    ])
+
+    await router.open('renderer:1', document())
+    expect(leases.acquire).toHaveBeenCalledWith(
+      'alpha.tools',
+      'worktree-1',
+      'renderer:1\u0000doc-1'
+    )
+
+    router.close('renderer:1', 'doc-1', 1)
+    expect(leases.release).toHaveBeenCalledWith(
+      'alpha.tools',
+      'worktree-1',
+      'renderer:1\u0000doc-1'
+    )
+
+    await router.open('renderer:1', document())
+    router.revokePlugin('alpha.tools')
+    expect(leases.revokePlugin).toHaveBeenCalledWith('alpha.tools')
   })
 
   it('uses lexical plugin/provider order for one completion provider', async () => {
@@ -297,7 +329,13 @@ describe('PluginEditorRouter', () => {
       getGrantedCapabilities: () => null,
       ensurePlugin,
       registry,
-      onDiagnostics: vi.fn()
+      onDiagnostics: vi.fn(),
+      leases: {
+        acquire: vi.fn(),
+        release: vi.fn(),
+        revokePlugin: vi.fn(),
+        has: vi.fn(() => false)
+      }
     })
 
     expect(await router.open('renderer:1', document())).toEqual([])
