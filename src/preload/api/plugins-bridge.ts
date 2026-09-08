@@ -6,6 +6,14 @@ import type {
 import type { PluginConsentRequest } from '../../shared/plugins/plugin-consent-request'
 import type { PluginChangeEvent } from '../../shared/plugins/plugin-change-event'
 import type {
+  EditorCancelRequest,
+  EditorCompletionRequest,
+  EditorDocumentChange,
+  EditorDocumentClose,
+  EditorDocumentOpen
+} from '../../shared/plugins/plugin-editor-protocol'
+import type { RendererEditorDiagnosticsEvent } from '../../shared/plugins/plugin-editor-renderer-contract'
+import type {
   PluginHostInstallResult,
   PluginHostInstallSource,
   PluginHostListEntry,
@@ -26,6 +34,22 @@ export const pluginsApi = {
   }): Promise<PluginPanelEntry | null> => ipcRenderer.invoke('plugins:readPanelEntry', args),
   invokeCommand: (args: { pluginKey: string; commandId: string; args?: unknown }) =>
     ipcRenderer.invoke('plugins:invokeCommand', args),
+  editorOpen: (args: EditorDocumentOpen) => ipcRenderer.invoke('plugins:editorOpen', args),
+  editorChange: (args: EditorDocumentChange) => ipcRenderer.invoke('plugins:editorChange', args),
+  editorClose: (args: EditorDocumentClose) => ipcRenderer.invoke('plugins:editorClose', args),
+  editorComplete: (args: EditorCompletionRequest) =>
+    ipcRenderer.invoke('plugins:editorComplete', args),
+  editorCancel: (args: EditorCancelRequest) => ipcRenderer.invoke('plugins:editorCancel', args),
+  onEditorDiagnostics: (
+    callback: (event: RendererEditorDiagnosticsEvent) => void
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      payload: RendererEditorDiagnosticsEvent
+    ): void => callback(payload)
+    ipcRenderer.on('plugins:editorDiagnostics', listener)
+    return () => ipcRenderer.removeListener('plugins:editorDiagnostics', listener)
+  },
   panelAction: (args: {
     sessionToken: string
     action: string

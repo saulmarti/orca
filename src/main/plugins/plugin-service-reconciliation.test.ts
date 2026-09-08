@@ -46,6 +46,18 @@ async function pluginRoot(pluginManifest = manifest()): Promise<string> {
 function testWorker(): PluginWorkerHandle & { dispose: ReturnType<typeof vi.fn> } {
   return {
     commands: ['run'],
+    editorProviders: [],
+    openEditorDocument: vi.fn(),
+    changeEditorDocument: vi.fn(),
+    closeEditorDocument: vi.fn(),
+    requestEditorCompletion: vi.fn(async () => ({
+      requestId: 'req-1',
+      documentId: 'doc-1',
+      version: 1,
+      completion: { isIncomplete: false, items: [] }
+    })),
+    cancelEditorRequest: vi.fn(),
+    onEditorDiagnostics: vi.fn(() => vi.fn()),
     invokeCommand: vi.fn(async () => null),
     deliverEvent: vi.fn(),
     lastActivityAt: () => Date.now(),

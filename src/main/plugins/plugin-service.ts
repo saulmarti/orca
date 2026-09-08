@@ -22,9 +22,8 @@ import {
 } from './plugin-discovery'
 import { PluginEventBus } from './plugin-event-bus'
 import { PluginAuditLog } from './plugin-audit-log'
-import { executePluginHostCallRequest } from './plugin-host-call-adapter'
 import { PluginContentVerifier } from './plugin-content-integrity'
-import { bindPluginHostServices, type PluginRuntimeDelegate } from './plugin-host-service-bindings'
+import type { PluginRuntimeDelegate } from './plugin-host-service-bindings'
 import { PluginLogBuffer, type PluginLogLine } from './plugin-log-buffer'
 import { PluginPanelController } from './plugin-panel-controller'
 import { PluginWorkerController } from './plugin-worker-controller'
@@ -36,8 +35,10 @@ import { PluginContentPackRegistry } from './plugin-content-pack-registry'
 import type { PluginServiceOptions } from './plugin-service-options'
 import type { PluginChangeEvent } from '../../shared/plugins/plugin-change-event'
 import { waitForPluginRefreshSettlement } from './plugin-refresh-settlement'
-import { assertPluginWorkerCommand } from './plugin-command-invocation'
-import { deliverPluginEvent } from './plugin-event-delivery'
+import { PluginEditorRouter } from './plugin-editor-router'
+import { PluginServiceRuntimeOperations } from './plugin-service-runtime-operations'
+import { PluginEditorDiagnosticsBus } from './plugin-editor-diagnostics-bus'
+import type { RendererEditorDiagnosticsEvent } from '../../shared/plugins/plugin-editor-renderer-contract'
 
 export type { PluginRuntimeDelegate } from './plugin-host-service-bindings'
 export type { PluginLogLine } from './plugin-log-buffer'
@@ -49,10 +50,13 @@ export class PluginService {
   private readonly eventBus = new PluginEventBus()
   private readonly audit: PluginAuditLog
   private readonly workerController: PluginWorkerController
+  private readonly runtimeOperations: PluginServiceRuntimeOperations
   private readonly logBuffer = new PluginLogBuffer()
   private readonly contentVerifier = new PluginContentVerifier()
+  private readonly editorDiagnosticsBus = new PluginEditorDiagnosticsBus()
   readonly contentPacks: PluginContentPackRegistry
   readonly panels: PluginPanelController
+  readonly editor: PluginEditorRouter
   private readonly changeListeners = new Set<(event: PluginChangeEvent) => void>()
   private readonly housekeeping = new PluginServiceHousekeeping()
   private discovered: DiscoveredPlugin[] = []
@@ -78,6 +82,7 @@ export class PluginService {
         this.executeHostCall(pluginKey, method, params, { viaPanel: true }),
       log: (pluginKey, line) => this.logBuffer.append(pluginKey, 'error', line)
     })
+    let editorRouter: PluginEditorRouter | null = null
     this.workerController = new PluginWorkerController({
       entryPath: options.hostEntryPath ?? '',
       maxActive: options.maxActiveWorkers,
@@ -93,12 +98,40 @@ export class PluginService {
         this.executeHostCall(pluginKey, method, params, { viaPanel: false }),
       log: (pluginKey, level, line) => this.logBuffer.append(pluginKey, level, line),
       onStateChanged: () => this.notifyChanged(false),
-      onWorkerGone: (pluginKey) => this.eventBus.clear(pluginKey)
+      onWorkerGone: (pluginKey) => {
+        this.eventBus.clear(pluginKey)
+        editorRouter?.revokePlugin(pluginKey)
+      }
+    })
+    this.editor = editorRouter = new PluginEditorRouter({
+      getPlugins: () => this.discovered,
+      getGrantedCapabilities: (pluginKey) => this.getGrantedCapabilities(pluginKey),
+      ensurePlugin: (plugin) => this.workerController.ensure(plugin),
+      registry: this.registry,
+      onDiagnostics: (event) => this.editorDiagnosticsBus.emit(event)
+    })
+    this.runtimeOperations = new PluginServiceRuntimeOperations({
+      pluginsDataDir: getPluginsDataDir(options.userDataPath),
+      eventBus: this.eventBus,
+      audit: this.audit,
+      workerController: this.workerController,
+      getPlugins: () => this.discovered,
+      findValidPlugin: (pluginKey) => this.findValidPlugin(pluginKey),
+      isRuntimeApproved: (plugin) => this.isRuntimeApproved(plugin),
+      getGrantedCapabilities: (pluginKey) => this.getGrantedCapabilities(pluginKey),
+      getRuntimeDelegate: () => this.runtimeDelegate,
+      isPluginSystemEnabled: () => this.options.isPluginSystemEnabled(),
+      isDisposed: () => this.disposed,
+      logWarning: (pluginKey, line) => this.logBuffer.append(pluginKey, 'warn', line)
     })
   }
 
   setRuntimeDelegate(delegate: PluginRuntimeDelegate | null): void {
     this.runtimeDelegate = delegate
+  }
+
+  onEditorDiagnostics(listener: (event: RendererEditorDiagnosticsEvent) => void): () => void {
+    return this.editorDiagnosticsBus.subscribe(listener)
   }
 
   onChanged(listener: (event: PluginChangeEvent) => void): () => void {
@@ -245,61 +278,25 @@ export class PluginService {
     return capabilityKinds(plugin.manifest.capabilities)
   }
 
-  /** Host API chokepoint for both transports (worker fork IPC + panel
-   *  bridge); serve RPC reuses it through the same entry points. */
   async executeHostCall(
     pluginKey: string,
     method: string,
     params: unknown,
     options: { viaPanel: boolean }
   ): Promise<PluginPanelActionOutcome> {
-    return executePluginHostCallRequest({
-      pluginKey,
-      request: { method, params },
-      viaPanel: options.viaPanel,
-      resolvePolicy: (boundPluginKey) => ({
-        grantedCapabilities: this.getGrantedCapabilities(boundPluginKey),
-        services: this.runtimeDelegate
-          ? bindPluginHostServices({
-              delegate: this.runtimeDelegate,
-              pluginsDataDir: getPluginsDataDir(this.options.userDataPath),
-              subscribeEvents: (key, events) => this.eventBus.subscribe(key, events)
-            })
-          : null,
-        audit: this.audit
-      })
-    })
+    return this.runtimeOperations.executeHostCall(pluginKey, method, params, options.viaPanel)
   }
 
-  async invokeCommand(pluginKey: string, commandId: string, args?: unknown): Promise<unknown> {
-    const plugin = this.findValidPlugin(pluginKey)
-    if (!plugin || !this.isRuntimeApproved(plugin)) {
-      throw new Error(`plugin ${pluginKey} is not enabled`)
-    }
-    assertPluginWorkerCommand(plugin, commandId)
-    const handle = await this.workerController.ensure(plugin)
-    if (!handle.commands.includes(commandId)) {
-      throw new Error(`plugin ${pluginKey} registered no handler for ${commandId}`)
-    }
-    return handle.invokeCommand(commandId, args)
+  invokeCommand(pluginKey: string, commandId: string, args?: unknown): Promise<unknown> {
+    return this.runtimeOperations.invokeCommand(pluginKey, commandId, args)
   }
 
   emitEvent(event: PluginEventName, payload: unknown): void {
-    if (!this.options.isPluginSystemEnabled() || this.disposed) {
-      return
-    }
-    deliverPluginEvent({
-      event,
-      payload,
-      plugins: this.discovered,
-      eventBus: this.eventBus,
-      workerController: this.workerController,
-      isRuntimeApproved: (plugin) => this.isRuntimeApproved(plugin),
-      logWarning: (pluginKey, line) => this.logBuffer.append(pluginKey, 'warn', line)
-    })
+    this.runtimeOperations.emitEvent(event, payload)
   }
 
   async deactivatePlugin(pluginKey: string): Promise<void> {
+    this.editor.revokePlugin(pluginKey)
     await this.workerController.deactivate(pluginKey)
     this.notifyChanged(false)
   }
@@ -331,6 +328,8 @@ export class PluginService {
     this.disposed = true
     this.housekeeping.dispose()
     this.panels.dispose()
+    this.editorDiagnosticsBus.clear()
+    this.editor.dispose()
     await this.refreshChain.catch(() => undefined)
     await this.workerController.dispose()
     await this.audit.flush()

@@ -27,6 +27,7 @@ import {
   registerPluginMarketplaceHandlers,
   type PluginMarketplaceHandlerServices
 } from './plugin-marketplaces'
+import { registerPluginEditorHandlers } from './plugin-editor-ipc'
 
 export function parsePluginConsentArgs(args: unknown): z.infer<typeof pluginConsentRequestSchema> {
   return pluginConsentRequestSchema.parse(args)
@@ -98,6 +99,7 @@ export function registerPluginHandlers(
   if (runtime) {
     pluginService.setRuntimeDelegate(runtime)
   }
+  registerPluginEditorHandlers(pluginService)
 
   store.onSettingsChanged((updates) => {
     if ('pluginSystemEnabled' in updates || 'devPluginPaths' in updates) {

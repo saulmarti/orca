@@ -7,6 +7,18 @@ import type { PluginLanguagePackRegistration } from '../../shared/plugins/plugin
 import type { PluginChangeEvent } from '../../shared/plugins/plugin-change-event'
 import type { PluginManifest } from '../../shared/plugins/plugin-manifest'
 import type { PluginMarketplaceGitSource } from '../../shared/plugins/plugin-marketplace'
+import type {
+  EditorCancelRequest,
+  EditorCompletionRequest,
+  EditorCompletionResponse,
+  EditorDocumentChange,
+  EditorDocumentClose,
+  EditorDocumentOpen
+} from '../../shared/plugins/plugin-editor-protocol'
+import type {
+  EditorProviderBinding,
+  RendererEditorDiagnosticsEvent
+} from '../../shared/plugins/plugin-editor-renderer-contract'
 
 /** Panel contribution as surfaced by the main-process plugin service. */
 export type PluginHostPanel = {
@@ -155,6 +167,12 @@ export type PluginsApi = {
     commandId: string
     args?: unknown
   }) => Promise<unknown>
+  editorOpen: (args: EditorDocumentOpen) => Promise<EditorProviderBinding[]>
+  editorChange: (args: EditorDocumentChange) => Promise<void>
+  editorClose: (args: EditorDocumentClose) => Promise<void>
+  editorComplete: (args: EditorCompletionRequest) => Promise<EditorCompletionResponse | null>
+  editorCancel: (args: EditorCancelRequest) => Promise<void>
+  onEditorDiagnostics: (callback: (event: RendererEditorDiagnosticsEvent) => void) => () => void
   /** Relays a sandboxed panel's bridge request to main, which enforces the
    *  plugin's consented capabilities before executing. */
   panelAction: (args: {
