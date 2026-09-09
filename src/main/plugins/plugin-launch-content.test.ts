@@ -44,20 +44,27 @@ describe('Phase 1 launch plugin content', () => {
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name)
       .sort()
-    expect(marketplace.plugins.map((plugin) => plugin.id).sort()).toEqual(localPluginDirectories)
+    const bundledIndex = (await readJson(join(launchRoot, 'bundled-plugins.json'))) as {
+      plugins: { pluginKey: string }[]
+    }
+    const expectedLocalPlugins = [
+      ...new Set([
+        ...marketplace.plugins.map((plugin) => plugin.id),
+        ...bundledIndex.plugins.map((plugin) => plugin.pluginKey)
+      ])
+    ].sort()
+    expect(localPluginDirectories).toEqual(expectedLocalPlugins)
 
     const contributionKinds = new Set<string>()
-    for (const listing of marketplace.plugins) {
+    for (const pluginId of localPluginDirectories) {
       const inspection = await inspectPluginInstallTree({
-        rootDir: join(launchRoot, listing.id),
+        rootDir: join(launchRoot, pluginId),
         hostVersion: '1.4.0',
-        expectedPluginKey: listing.id
+        expectedPluginKey: pluginId
       })
-      expect(inspection, `${listing.id} must pass the production install inspection`).toMatchObject(
-        {
-          ok: true
-        }
-      )
+      expect(inspection, `${pluginId} must pass the production install inspection`).toMatchObject({
+        ok: true
+      })
       if (!inspection.ok) {
         continue
       }
@@ -108,6 +115,9 @@ describe('Phase 1 launch plugin content', () => {
     })
 
     expect(result.errors).toEqual([])
-    expect(result.installed).toEqual(['stablyai.orca-navigation-shortcuts'])
+    expect(result.installed).toEqual([
+      'stablyai.orca-navigation-shortcuts',
+      'stablyai.orca-typescript'
+    ])
   })
 })

@@ -71,6 +71,9 @@ describeIfBuilt('orca orchestration check --wait subprocess (§3.4)', () => {
     const runtime = new OrcaRuntimeService()
     const db = new OrchestrationDb(':memory:')
     runtime.setOrchestrationDb(db)
+    vi.spyOn(runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
+      handle === 'term_nobody' ? 'tab_nobody:22222222-2222-4222-8222-222222222222' : null
+    )
     const server = new OrcaRuntimeRpcServer({ runtime, userDataPath })
     await server.start()
 

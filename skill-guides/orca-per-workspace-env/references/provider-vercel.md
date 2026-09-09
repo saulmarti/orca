@@ -18,7 +18,13 @@ verification, snapshot creation, and writing state; cleanup failure must remain 
 cleanup_snapshot() {
   snapshot_exit=$?
   trap - EXIT
-  if ! vercel sandbox remove "$1" "${vercel_args[@]}" >&2; then
+  cleanup_failed=0
+  if ((${#vercel_args[@]})); then
+    vercel sandbox remove "$1" "${vercel_args[@]}" >&2 || cleanup_failed=1
+  else
+    vercel sandbox remove "$1" >&2 || cleanup_failed=1
+  fi
+  if ((cleanup_failed)); then
     echo "Sandbox cleanup failed for $1; inspect and remove it before continuing" >&2
     snapshot_exit=1
   fi

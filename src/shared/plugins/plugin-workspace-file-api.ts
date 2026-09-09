@@ -1,5 +1,6 @@
-import { Buffer } from 'node:buffer'
 import { z } from 'zod'
+
+const utf8Encoder = new TextEncoder()
 
 export const PLUGIN_WORKSPACE_FILE_BATCH_LIMIT = 256
 export const PLUGIN_WORKSPACE_FILE_MAX_BYTES = 4 * 1024 * 1024
@@ -91,7 +92,7 @@ const readOkSchema = z
     mtimeMs: mtimeSchema
   })
   .strict()
-  .refine((value) => Buffer.byteLength(value.content, 'utf8') === value.byteLength, {
+  .refine((value) => utf8Encoder.encode(value.content).byteLength === value.byteLength, {
     message: 'byteLength must match UTF-8 content length'
   })
   .refine((value) => value.byteLength <= PLUGIN_WORKSPACE_FILE_MAX_BYTES, {
