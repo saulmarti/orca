@@ -34,6 +34,7 @@ describe('electron-builder config', () => {
         '!resources/skills/**',
         '!tests{,/**/*}',
         '!examples{,/**/*}',
+        '!plugins{,/**/*}',
         '!pr-evidence{,/**/*}',
         '!{.claude,.grok,.agents,.codex}{,/**/*}',
         '!Casks{,/**/*}',

@@ -7,12 +7,14 @@ import type { WorkspaceFileCache, WorkspaceFileInput } from './workspace-file-ca
 type ProjectManagerOptions = {
   documents: DocumentStore
   cache: WorkspaceFileCache
+  standardLibDirectory?: string
 }
 
 type GetOrCreateProjectOptions = {
   resolution: ProjectResolution
   rootFiles: string[]
   compilerOptions?: ts.CompilerOptions
+  standardLibDirectory?: string
 }
 
 function worktreeIdFromKey(key: string): string {
@@ -47,10 +49,20 @@ export class ProjectManager {
       documents: this.options.documents,
       cache: this.options.cache,
       rootFiles: options.rootFiles,
-      ...(options.compilerOptions ? { compilerOptions: options.compilerOptions } : {})
+      ...(this.options.standardLibDirectory
+        ? { standardLibDirectory: this.options.standardLibDirectory }
+        : {}),
+      ...(options.compilerOptions ? { compilerOptions: options.compilerOptions } : {}),
+      ...(options.standardLibDirectory
+        ? { standardLibDirectory: options.standardLibDirectory }
+        : {})
     })
     this.projects.set(options.resolution.key, project)
     return project
+  }
+
+  get(projectKey: string): TypeScriptProject | undefined {
+    return this.projects.get(projectKey)
   }
 
   noteDocumentChange(projectKey: string): void {

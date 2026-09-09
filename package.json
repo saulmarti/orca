@@ -303,12 +303,12 @@
     "windows-native-registry": "3.2.2"
   },
   "lint-staged": {
-    "{*.{ts,tsx,js,jsx,mjs,mts,cts},!(cloud)/**/*.{ts,tsx,js,jsx,mjs,mts,cts}}": [
+    "{*.{ts,tsx,js,jsx,mjs,mts,cts},!(cloud|resources)/**/*.{ts,tsx,js,jsx,mjs,mts,cts},resources/*.{ts,tsx,js,jsx,mjs,mts,cts},resources/!(plugins)/**/*.{ts,tsx,js,jsx,mjs,mts,cts},resources/plugins/*.{ts,tsx,js,jsx,mjs,mts,cts},resources/plugins/!(launch)/**/*.{ts,tsx,js,jsx,mjs,mts,cts}}": [
       "oxlint",
       "oxlint --config config/oxlint-react-doctor.json",
       "oxfmt --write"
     ],
-    "{*.{json,css},!(cloud)/**/*.{json,css}}": [
+    "{*.{json,css},!(cloud|resources)/**/*.{json,css},resources/*.{json,css},resources/!(plugins)/**/*.{json,css},resources/plugins/*.{json,css},resources/plugins/!(launch)/**/*.{json,css}}": [
       "oxfmt --write"
     ]
   },

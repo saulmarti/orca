@@ -52,3 +52,15 @@ describe('WorkspaceFileCache', () => {
     expect(cache.projectTextBytes('project-b')).toBeLessThanOrEqual(6)
   })
 })
+
+it('releases project ownership without deleting files still shared by another project', () => {
+  const cache = new WorkspaceFileCache()
+  cache.setFile('project-a', 'wt-1', 'src/shared.ts', file('shared'))
+  cache.setFile('project-b', 'wt-1', 'src/shared.ts', file('shared'))
+  cache.setFile('project-a', 'wt-1', 'src/only-a.ts', file('only-a'))
+
+  cache.releaseProject('project-a')
+
+  expect(cache.getDisk('wt-1', 'src/only-a.ts')).toBeUndefined()
+  expect(cache.getDisk('wt-1', 'src/shared.ts')).toMatchObject({ status: 'file', text: 'shared' })
+})

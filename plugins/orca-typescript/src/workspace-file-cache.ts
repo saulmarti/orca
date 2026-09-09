@@ -122,6 +122,15 @@ export class WorkspaceFileCache {
     }
     return total
   }
+
+  releaseProject(projectKey: string): void {
+    for (const [key, record] of this.records) {
+      record.projectKeys.delete(projectKey)
+      if (record.projectKeys.size === 0) {
+        this.records.delete(key)
+      }
+    }
+  }
   private enforceProjectBudget(projectKey: string): void {
     while (this.projectTextBytes(projectKey) > this.projectByteBudget) {
       const candidate = this.oldestFile((record) => record.projectKeys.has(projectKey))

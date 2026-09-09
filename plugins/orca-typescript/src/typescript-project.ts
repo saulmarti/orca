@@ -1,11 +1,15 @@
-import { dirname, isAbsolute, relative, sep } from 'node:path'
-import { posix } from 'node:path'
+import { dirname, join, posix } from 'node:path'
 import * as ts from '@typescript/typescript6'
 import type { EditorPosition } from '../../../src/shared/plugins/plugin-editor-protocol'
+import {
+  VIRTUAL_ROOT,
+  isInside,
+  positionAt,
+  relativeFromVirtual,
+  virtualFileName
+} from './typescript-project-paths'
 import type { DocumentStore } from './document-store'
 import type { WorkspaceFileCache } from './workspace-file-cache'
-
-const VIRTUAL_ROOT = '/__orca__'
 
 export const INFERRED_COMPILER_OPTIONS: ts.CompilerOptions = {
   allowJs: true,
@@ -25,35 +29,7 @@ type TypeScriptProjectOptions = {
   cache: WorkspaceFileCache
   rootFiles: string[]
   compilerOptions?: ts.CompilerOptions
-}
-function virtualFileName(relativePath: string): string {
-  return posix.join(VIRTUAL_ROOT, relativePath.replace(/\\/g, '/'))
-}
-
-function relativeFromVirtual(fileName: string): string | null {
-  const normalized = fileName.replace(/\\/g, '/')
-  const prefix = `${VIRTUAL_ROOT}/`
-  return normalized.startsWith(prefix) ? normalized.slice(prefix.length) : null
-}
-
-function isInside(root: string, candidate: string): boolean {
-  const rel = relative(root, candidate)
-  return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel))
-}
-
-function positionAt(text: string, offset: number): EditorPosition {
-  if (offset < 0 || offset > text.length) {
-    throw new Error('completion offset outside document')
-  }
-  let line = 0
-  let lineStart = 0
-  for (let index = 0; index < offset; index += 1) {
-    if (text.charCodeAt(index) === 10) {
-      line += 1
-      lineStart = index + 1
-    }
-  }
-  return { line, character: offset - lineStart }
+  standardLibDirectory?: string
 }
 export class TypeScriptProject {
   readonly key: string
@@ -77,7 +53,8 @@ export class TypeScriptProject {
     this.cache = options.cache
     this.rootFiles = [...new Set(options.rootFiles.map((path) => path.replace(/\\/g, '/')))]
     this.compilerOptions = { ...INFERRED_COMPILER_OPTIONS, ...options.compilerOptions }
-    this.standardLibDirectory = dirname(ts.getDefaultLibFilePath(this.compilerOptions))
+    this.standardLibDirectory =
+      options.standardLibDirectory ?? dirname(ts.getDefaultLibFilePath(this.compilerOptions))
 
     let host: ts.LanguageServiceHost
     host = {
@@ -86,7 +63,8 @@ export class TypeScriptProject {
       getScriptVersion: (fileName) => this.scriptVersion(fileName),
       getScriptSnapshot: (fileName) => this.scriptSnapshot(fileName),
       getCurrentDirectory: () => VIRTUAL_ROOT,
-      getDefaultLibFileName: (compilerOptions) => ts.getDefaultLibFilePath(compilerOptions),
+      getDefaultLibFileName: (compilerOptions) =>
+        join(this.standardLibDirectory, ts.getDefaultLibFileName(compilerOptions)),
       fileExists: (fileName) => this.fileExists(fileName),
       readFile: (fileName) => this.readFile(fileName),
       readDirectory: (directoryName) => this.readDirectory(directoryName),

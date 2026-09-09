@@ -5,6 +5,11 @@
       "pluginKey": "stablyai.orca-navigation-shortcuts",
       "path": "stablyai.orca-navigation-shortcuts",
       "contentHash": "ce3a146bae9e121a18cb86a710973422be749a25da5a1c21a8911e2e98cc3a77"
+    },
+    {
+      "pluginKey": "stablyai.orca-typescript",
+      "path": "stablyai.orca-typescript",
+      "contentHash": "47c7661ccb9335b36920a5e8c97ec79220eda29f9aa2676bd9af34b6a19e6cb6"
     }
   ]
 }

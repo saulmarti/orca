@@ -116,3 +116,18 @@ describe('ProjectManager dependency invalidation', () => {
     ).toBe(other)
   })
 })
+
+describe('ProjectManager bundled standard libraries', () => {
+  it('forwards the configured standard library directory to new projects', () => {
+    const documents = new DocumentStore()
+    const cache = new WorkspaceFileCache()
+    const manager = new ProjectManager({
+      documents,
+      cache,
+      standardLibDirectory: '/artifact/lib'
+    } as never)
+    const project = manager.getOrCreate({ resolution, rootFiles: ['src/example.ts'] })
+
+    expect(Reflect.get(project, 'standardLibDirectory')).toBe('/artifact/lib')
+  })
+})
