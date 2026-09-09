@@ -1,0 +1,21 @@
+{
+  "manifestVersion": 1,
+  "id": "orca-typescript",
+  "publisher": "stablyai",
+  "name": "Orca TypeScript",
+  "version": "1.0.0",
+  "description": "TypeScript and JavaScript language intelligence for Orca.",
+  "engines": { "orca": ">=1.4.0" },
+  "pluginApi": 1,
+  "main": "worker.mjs",
+  "contributes": {
+    "editorProviders": [
+      {
+        "id": "typescript",
+        "languages": ["typescript", "typescriptreact", "javascript", "javascriptreact"],
+        "features": ["completion", "diagnostics"]
+      }
+    ]
+  },
+  "capabilities": [{ "kind": "editor:languageService" }, { "kind": "workspace:readFiles" }]
+}

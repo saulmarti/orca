@@ -87,6 +87,7 @@ describe('plugin worker editor API', () => {
     documentId: 'doc-1',
     worktreeId: 'worktree-1',
     filePath: 'src/index.ts',
+    relativePath: 'src/index.ts',
     languageId: 'typescript',
     version: 1,
     text: 'const value = 1'

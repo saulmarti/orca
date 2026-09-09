@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { PLUGIN_EVENT_NAMES } from './plugin-manifest'
 import type { PluginCapabilityKind } from './plugin-capabilities'
+import { PLUGIN_WORKSPACE_FILE_HOST_METHODS } from './plugin-workspace-file-api'
 
 /**
  * Host API v0 — the separately-versioned public facade plugins call. Every
@@ -120,6 +121,7 @@ const spec = <P extends z.ZodTypeAny, R extends z.ZodTypeAny>(
 ): PluginHostMethodSpec => ({ ...entry, stability: 'experimental' })
 
 export const PLUGIN_HOST_API_V0: readonly PluginHostMethodSpec[] = [
+  ...PLUGIN_WORKSPACE_FILE_HOST_METHODS,
   spec({
     name: 'workspace.readContext',
     since: '1.0',

@@ -7,6 +7,7 @@ import type {
 } from '../../shared/plugins/plugin-editor-protocol'
 import { PLUGIN_EDITOR_PROVIDER_EXTENSION_POINT } from '../../shared/plugins/plugin-extension-registry'
 import { matchingEditorProviderGroups } from './plugin-editor-router-candidates'
+import { pluginEditorWorktreeLeases } from './plugin-editor-worktree-leases'
 import type {
   BoundProvider,
   DocumentState,
@@ -30,10 +31,13 @@ function providerKey(pluginKey: string, providerId: string): string {
 }
 
 export class PluginEditorRouter {
+  private readonly leases: NonNullable<PluginEditorRouterOptions['leases']>
   private readonly documents = new Map<string, DocumentState>()
   private readonly pendingCompletions = new Map<string, PendingCompletion>()
 
-  constructor(private readonly options: PluginEditorRouterOptions) {}
+  constructor(private readonly options: PluginEditorRouterOptions) {
+    this.leases = options.leases ?? pluginEditorWorktreeLeases
+  }
 
   async open(ownerKey: string, document: EditorDocumentOpen): Promise<EditorProviderBinding[]> {
     const key = documentKey(ownerKey, document.documentId)
@@ -77,10 +81,14 @@ export class PluginEditorRouter {
     const state: DocumentState = {
       ownerKey,
       documentId: document.documentId,
+      worktreeId: document.worktreeId,
       version: document.version,
       bindings
     }
     this.documents.set(key, state)
+    for (const pluginKey of new Set(bindings.map((binding) => binding.pluginKey))) {
+      this.leases.acquire(pluginKey, document.worktreeId, key)
+    }
 
     for (const binding of bindings) {
       if (binding.features.includes('diagnostics')) {
@@ -184,7 +192,14 @@ export class PluginEditorRouter {
       binding.unsubscribeDiagnostics?.()
       binding.provider.closeDocument({ documentId, finalVersion })
     }
+    for (const pluginKey of new Set(state.bindings.map((binding) => binding.pluginKey))) {
+      this.leases.release(pluginKey, state.worktreeId, key)
+    }
     this.documents.delete(key)
+  }
+
+  hasWorktreeLease(pluginKey: string, worktreeId: string): boolean {
+    return this.leases.has(pluginKey, worktreeId)
   }
 
   revokeOwner(ownerKey: string): void {
@@ -196,6 +211,7 @@ export class PluginEditorRouter {
   }
 
   revokePlugin(pluginKey: string): void {
+    this.leases.revokePlugin(pluginKey)
     for (const [key, state] of this.documents) {
       const revoked = state.bindings.filter((binding) => binding.pluginKey === pluginKey)
       if (revoked.length === 0) {

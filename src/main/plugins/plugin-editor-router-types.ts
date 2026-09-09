@@ -20,6 +20,7 @@ export type BoundProvider = EditorProviderBinding & {
 export type DocumentState = {
   ownerKey: string
   documentId: string
+  worktreeId: string
   version: number
   bindings: BoundProvider[]
 }
@@ -35,4 +36,10 @@ export type PluginEditorRouterOptions = {
   ensurePlugin: (plugin: ValidDiscoveredPlugin) => Promise<unknown>
   registry: PluginExtensionRegistry
   onDiagnostics: (event: RendererEditorDiagnosticsEvent) => void
+  leases?: {
+    acquire(pluginKey: string, worktreeId: string, documentKey: string): void
+    release(pluginKey: string, worktreeId: string, documentKey: string): void
+    revokePlugin(pluginKey: string): void
+    has(pluginKey: string, worktreeId: string): boolean
+  }
 }

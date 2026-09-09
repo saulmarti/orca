@@ -3,6 +3,7 @@ import { PLUGIN_WORKSPACE_TERMINAL_LIMIT } from '../../shared/plugins/plugin-hos
 import type { PluginHostServices } from './plugin-host-methods'
 import { PluginSecretsStore } from './plugin-secrets-store'
 import { PluginKvStore } from './plugin-storage-store'
+import { pluginEditorWorktreeLeases } from './plugin-editor-worktree-leases'
 import {
   describeAgentSessionPtyWriteRefusal,
   isAgentSessionPtyWriteRefusedError
@@ -30,6 +31,17 @@ export type PluginRuntimeDelegate = {
     title: string
     body?: string
   }): Promise<{ delivered: boolean }>
+  readPluginWorkspaceDirectory?(
+    worktreeSelector: string,
+    path: string,
+    maxEntries: number
+  ): Promise<unknown>
+  statPluginWorkspaceFiles?(worktreeSelector: string, paths: readonly string[]): Promise<unknown[]>
+  readPluginWorkspaceFiles?(
+    worktreeSelector: string,
+    paths: readonly string[],
+    maxFileBytes: number
+  ): Promise<unknown[]>
 }
 
 export function bindPluginHostServices(input: {
@@ -39,6 +51,26 @@ export function bindPluginHostServices(input: {
 }): PluginHostServices {
   const { delegate, pluginsDataDir, subscribeEvents } = input
   return {
+    hasEditorWorktreeLease: (pluginId, worktreeId) =>
+      pluginEditorWorktreeLeases.has(pluginId, worktreeId),
+    readPluginWorkspaceDirectory: (worktreeId, path, maxEntries) => {
+      if (!delegate.readPluginWorkspaceDirectory) {
+        throw new Error('workspace file runtime is unavailable')
+      }
+      return delegate.readPluginWorkspaceDirectory(`id:${worktreeId}`, path, maxEntries)
+    },
+    statPluginWorkspaceFiles: (worktreeId, paths) => {
+      if (!delegate.statPluginWorkspaceFiles) {
+        throw new Error('workspace file runtime is unavailable')
+      }
+      return delegate.statPluginWorkspaceFiles(`id:${worktreeId}`, paths)
+    },
+    readPluginWorkspaceFiles: (worktreeId, paths, maxFileBytes) => {
+      if (!delegate.readPluginWorkspaceFiles) {
+        throw new Error('workspace file runtime is unavailable')
+      }
+      return delegate.readPluginWorkspaceFiles(`id:${worktreeId}`, paths, maxFileBytes)
+    },
     resolveActiveWorktreeContext: async () => {
       const context = await delegate.resolveActiveWorktreeContext()
       if (!context) {

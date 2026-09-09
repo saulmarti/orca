@@ -91,6 +91,7 @@ describe('PluginService editor router', () => {
       documentId: 'doc-1',
       worktreeId: 'worktree-1',
       filePath: 'src/index.ts',
+      relativePath: 'src/index.ts',
       languageId: 'typescript',
       version: 1,
       text: 'const value = 1'
@@ -104,5 +105,8 @@ describe('PluginService editor router', () => {
         features: ['completion', 'diagnostics']
       }
     ])
+    expect(service.editor.hasWorktreeLease('orca-samples.demo', 'worktree-1')).toBe(true)
+    service.editor.close('renderer:1', 'doc-1', 1)
+    expect(service.editor.hasWorktreeLease('orca-samples.demo', 'worktree-1')).toBe(false)
   })
 })

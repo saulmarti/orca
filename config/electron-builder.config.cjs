@@ -181,6 +181,9 @@ module.exports = {
     // carries hostile-panel, the adversarial fixture the containment tests point at,
     // which must never reach a user's install.
     '!examples{,/**/*}',
+    // Why: first-party plugin authoring sources are generated into immutable launch resources;
+    // only resources/plugins/launch is a runtime input.
+    '!plugins{,/**/*}',
     // Why: pr-evidence/ is a local e2e screenshot output (ORCA_CAPTURE_EVIDENCE);
     // it is gitignored, but exclude it defensively so a stray local capture at
     // package time never bloats app.asar.

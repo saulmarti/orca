@@ -47,9 +47,10 @@ export function attachEditorPluginBridge(args: {
   monaco: MonacoApi
   worktreeId: string
   filePath: string
+  relativePath: string
   languageId: string
 }): { dispose(): void } {
-  const { editorInstance, monaco, worktreeId, filePath, languageId } = args
+  const { editorInstance, monaco, worktreeId, filePath, relativePath, languageId } = args
   const model = editorInstance.getModel()
   if (!model) {
     return { dispose() {} }
@@ -68,6 +69,7 @@ export function attachEditorPluginBridge(args: {
       documentId,
       worktreeId,
       filePath,
+      relativePath,
       languageId,
       version,
       text: model.getValue()

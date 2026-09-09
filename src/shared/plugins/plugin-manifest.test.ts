@@ -37,6 +37,17 @@ describe('pluginManifestSchema boundaries', () => {
     expect(result).toMatchObject({ ok: true })
   })
 
+  it('accepts workspace file-read consent for language-service plugins', () => {
+    const result = parsePluginManifest(
+      manifest({
+        main: 'worker.mjs',
+        capabilities: [{ kind: 'editor:languageService' }, { kind: 'workspace:readFiles' }]
+      })
+    )
+
+    expect(result).toMatchObject({ ok: true })
+  })
+
   it('accepts an editor provider with language-service consent', () => {
     const result = parsePluginManifest(
       manifest({

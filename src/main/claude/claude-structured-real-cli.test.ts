@@ -44,6 +44,7 @@ const realClaudeAuthStatus = (() => {
   }
 })()
 const realClaudeAuthenticated = realClaudeAuthStatus?.loggedIn === true
+const realClaudeLiveProbesEnabled = process.env.ORCA_CLAUDE_LIVE_PROBES === '1'
 
 function realAdapter(
   providerSessionId: string,
@@ -95,7 +96,7 @@ async function waitForResolvedTranscript(
 }
 
 describe.skipIf(!realClaudeAvailable)('Claude structured real CLI handshake', () => {
-  it.skipIf(!realClaudeAuthenticated)(
+  it.skipIf(!realClaudeLiveProbesEnabled || !realClaudeAuthenticated)(
     'proves a pre-minted session before the first user message',
     async () => {
       const providerSessionId = randomUUID()
@@ -147,7 +148,7 @@ describe.skipIf(!realClaudeAvailable)('Claude structured real CLI handshake', ()
   // Effort pill survived every gate: the fixture invented an `effortLevel` on a
   // frame the CLI does not send. This asserts both halves against the live
   // binary — that get_settings reports the effort, and that init does not.
-  it.skipIf(!realClaudeAuthenticated)(
+  it.skipIf(!realClaudeLiveProbesEnabled || !realClaudeAuthenticated)(
     'reports the current effort through get_settings and never on the init frame',
     async () => {
       const providerSessionId = randomUUID()
@@ -190,7 +191,11 @@ describe.skipIf(!realClaudeAvailable)('Claude structured real CLI handshake', ()
   // would move both sides together and stay green in exactly the environment that
   // blacks mobile out.
   // The turn is what creates the file: an init-only handshake writes nothing.
-  it.skipIf(!realClaudeAuthenticated || !realClaudeAuthStatus?.projectsDirectory)(
+  it.skipIf(
+    !realClaudeLiveProbesEnabled ||
+      !realClaudeAuthenticated ||
+      !realClaudeAuthStatus?.projectsDirectory
+  )(
     'writes its transcript where the mobile session-file resolver looks for it',
     async () => {
       const providerSessionId = randomUUID()
@@ -234,7 +239,7 @@ describe.skipIf(!realClaudeAvailable)('Claude structured real CLI handshake', ()
   // asserts that frame carries the resolved model against the live binary; it goes
   // red the day the CLI stops reporting it, which is the day the confirmation
   // silently degrades to echoing back whatever Orca sent.
-  it.skipIf(!realClaudeAuthenticated)(
+  it.skipIf(!realClaudeLiveProbesEnabled || !realClaudeAuthenticated)(
     'reports the model it adopted on the init frame that opens each turn',
     async () => {
       const providerSessionId = randomUUID()

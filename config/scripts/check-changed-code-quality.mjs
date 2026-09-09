@@ -7,7 +7,7 @@ import { resolvePullRequestDiffBase } from './git-pull-request-diff-base.mjs'
 import { resolveOxlintInvocation } from './oxlint-cli-invocation.mjs'
 
 const SOURCE_FILE_PATTERN = /\.(?:[cm]?[jt]sx?)$/
-const ROOT_CODE_QUALITY_IGNORED_PREFIXES = ['cloud/']
+const ROOT_CODE_QUALITY_IGNORED_PREFIXES = ['cloud/', 'resources/plugins/launch/']
 export const OXLINT_SCANS = [
   {
     // Why: no --config, so Oxlint keeps discovering nested configs. Pinning the root
