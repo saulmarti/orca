@@ -140,6 +140,11 @@ export async function startPluginWorker(
           return
         }
         switch (message.type) {
+          case 'editorCompletionResult':
+          case 'editorDiagnostics':
+            // Why: editorTransport owns these variants and returns above when it handles them.
+            // Keep explicit fallthrough coverage so the child-message switch stays exhaustive.
+            return
           case 'ready': {
             if (!settled) {
               settled = true

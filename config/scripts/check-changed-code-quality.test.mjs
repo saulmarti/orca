@@ -58,6 +58,16 @@ describe('changed-code quality line matching', () => {
     expect(isRootCodeQualityPath('cloud/apps/relay/src/index.ts')).toBe(false)
     expect(isRootCodeQualityPath('src/main/index.ts')).toBe(true)
   })
+
+  it('excludes generated bundled plugin artifacts but keeps plugin authoring source', () => {
+    expect(
+      isRootCodeQualityPath('resources/plugins/launch/stablyai.orca-typescript/worker.mjs')
+    ).toBe(false)
+    expect(
+      isRootCodeQualityPath('resources/plugins/launch/stablyai.orca-typescript/lib/lib.dom.d.ts')
+    ).toBe(false)
+    expect(isRootCodeQualityPath('plugins/orca-typescript/src/index.ts')).toBe(true)
+  })
 })
 
 describe('moved-code exemption', () => {

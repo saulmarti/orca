@@ -99,6 +99,9 @@ async function main() {
     platform: 'node',
     format: 'esm',
     target: 'node20',
+    banner: {
+      js: "import { createRequire as __orcaCreateRequire } from 'node:module'; import { fileURLToPath as __orcaFileURLToPath } from 'node:url'; import { dirname as __orcaDirname } from 'node:path'; const require = __orcaCreateRequire(import.meta.url); const __filename = __orcaFileURLToPath(import.meta.url); const __dirname = __orcaDirname(__filename);"
+    },
     sourcemap: false,
     legalComments: 'none'
   })

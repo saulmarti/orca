@@ -1,4 +1,6 @@
 import { readFile, readdir } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -6,6 +8,7 @@ import { hashPluginTree } from '../../../src/main/plugins/plugin-content-hash'
 import { parsePluginManifest } from '../../../src/shared/plugins/plugin-manifest'
 
 const require = createRequire(import.meta.url)
+const execFileAsync = promisify(execFile)
 const sourceRoot = resolve('plugins/orca-typescript')
 const artifactRoot = resolve('resources/plugins/launch/stablyai.orca-typescript')
 
@@ -60,6 +63,14 @@ describe('orca-typescript bundled artifact', () => {
     }
     expect(hashed.totalBytes).toBeLessThan(50 * 1024 * 1024)
     expect(hashed.fileCount).toBeLessThanOrEqual(2_000)
+  })
+
+  it('loads the generated worker in a native Node ESM process', async () => {
+    const workerPath = join(artifactRoot, 'worker.mjs')
+    const script = `import(${JSON.stringify(`file://${workerPath}`)}).then((module) => { if (typeof module.default !== 'function') process.exit(2) })`
+    await expect(
+      execFileAsync(process.execPath, ['--input-type=module', '-e', script])
+    ).resolves.toMatchObject({ stderr: '' })
   })
 
   it('matches the deterministic content hash in bundled-plugins.json', async () => {

@@ -10,10 +10,7 @@ type Provider = {
   openDocument?(document: EditorDocumentOpen): void | Promise<void>
   changeDocument?(change: EditorDocumentChange): void | Promise<void>
   closeDocument?(document: { documentId: string; finalVersion: number }): void | Promise<void>
-  provideCompletions?(
-    request: EditorCompletionRequest,
-    signal: AbortSignal
-  ): unknown | Promise<unknown>
+  provideCompletions?(request: EditorCompletionRequest, signal: AbortSignal): unknown
 }
 
 const files: Record<string, string> = {

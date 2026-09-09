@@ -8,39 +8,27 @@ import {
 } from '../../../src/shared/plugins/plugin-editor-protocol'
 import type { TypeScriptProject } from './typescript-project'
 
+const COMPLETION_KINDS: Partial<Record<ts.ScriptElementKind, EditorCompletionKind>> = {
+  [ts.ScriptElementKind.memberFunctionElement]: 'method',
+  [ts.ScriptElementKind.functionElement]: 'function',
+  [ts.ScriptElementKind.memberVariableElement]: 'property',
+  [ts.ScriptElementKind.memberGetAccessorElement]: 'property',
+  [ts.ScriptElementKind.memberSetAccessorElement]: 'property',
+  [ts.ScriptElementKind.variableElement]: 'variable',
+  [ts.ScriptElementKind.letElement]: 'variable',
+  [ts.ScriptElementKind.constElement]: 'constant',
+  [ts.ScriptElementKind.classElement]: 'class',
+  [ts.ScriptElementKind.interfaceElement]: 'interface',
+  [ts.ScriptElementKind.moduleElement]: 'module',
+  [ts.ScriptElementKind.externalModuleName]: 'module',
+  [ts.ScriptElementKind.enumElement]: 'enum',
+  [ts.ScriptElementKind.enumMemberElement]: 'enumMember',
+  [ts.ScriptElementKind.keyword]: 'keyword',
+  [ts.ScriptElementKind.typeParameterElement]: 'typeParameter'
+}
+
 function completionKind(kind: ts.ScriptElementKind): EditorCompletionKind | undefined {
-  switch (kind) {
-    case ts.ScriptElementKind.memberFunctionElement:
-      return 'method'
-    case ts.ScriptElementKind.functionElement:
-      return 'function'
-    case ts.ScriptElementKind.memberVariableElement:
-    case ts.ScriptElementKind.memberGetAccessorElement:
-    case ts.ScriptElementKind.memberSetAccessorElement:
-      return 'property'
-    case ts.ScriptElementKind.variableElement:
-    case ts.ScriptElementKind.letElement:
-      return 'variable'
-    case ts.ScriptElementKind.constElement:
-      return 'constant'
-    case ts.ScriptElementKind.classElement:
-      return 'class'
-    case ts.ScriptElementKind.interfaceElement:
-      return 'interface'
-    case ts.ScriptElementKind.moduleElement:
-    case ts.ScriptElementKind.externalModuleName:
-      return 'module'
-    case ts.ScriptElementKind.enumElement:
-      return 'enum'
-    case ts.ScriptElementKind.enumMemberElement:
-      return 'enumMember'
-    case ts.ScriptElementKind.keyword:
-      return 'keyword'
-    case ts.ScriptElementKind.typeParameterElement:
-      return 'typeParameter'
-    default:
-      return undefined
-  }
+  return COMPLETION_KINDS[kind]
 }
 
 export function adaptCompletionEntry(
